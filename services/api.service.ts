@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } f
 
 // API Configuration
 const API_CONFIG = {
-  BASE_URL: 'http://localhost:8888/api/v1',
+  BASE_URL: 'http://10.0.2.2:8888/api/v1',
   TIMEOUT: 30000,
   HEADERS: {
     'Content-Type': 'application/json',

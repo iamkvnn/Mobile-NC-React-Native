@@ -21,7 +21,7 @@ class AuthService {
    */
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     try {
-      const response = await apiService.post<AuthResponse>(
+      const response = await apiService.post<any>(
         this.AUTH_ENDPOINTS.LOGIN,
         credentials
       );
@@ -29,7 +29,7 @@ class AuthService {
       // Cookie is set automatically by server in Set-Cookie header
       // No need to manually store anything on client side
 
-      return response;
+      return response.data; // Unwrap data from {data, message, success}
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -43,14 +43,14 @@ class AuthService {
    */
   async register(userData: RegisterRequest): Promise<AuthResponse> {
     try {
-      const response = await apiService.post<AuthResponse>(
+      const response = await apiService.post<any>(
         this.AUTH_ENDPOINTS.REGISTER,
         userData
       );
 
       // Cookie is set automatically by server in Set-Cookie header
       // No need to manually store anything on client side
-      return response;
+      return response.data; // Unwrap data from {data, message, success}
     } catch (error) {
       console.error('Registration error:', error);
       throw error;

@@ -3,7 +3,6 @@ import { useRouter, useSegments } from 'expo-router';
 import { User, LoginRequest, RegisterRequest } from '@/types/api.types';
 import { authService } from '@/services/auth.service';
 import { userService } from '@/services/user.service';
-import { setUserData, getUserData, removeUserData } from '@/utils/storage';
 
 /**
  * Auth Context State Interface
@@ -15,7 +14,6 @@ interface AuthContextState {
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
 }
 
 /**
@@ -62,23 +60,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Initialize authentication state
-   * Check if user has valid cookie by fetching user data
+   * Cookie will be sent automatically - if valid, user data is fetched
    */
   const initializeAuth = async () => {
     try {
-      // Try to get cached user data first for instant UI
-      const cachedUser = await getUserData<User>();
-      if (cachedUser) {
-        setUser(cachedUser);
-      }
-
-      // Try to fetch user data from API (cookie will be sent automatically)
-      // If cookie is valid, this will succeed
-      await refreshUser();
+      // Fetch user data from API (cookie is sent automatically)
+      const userData = await userService.getCurrentUser();
+      setUser(userData);
     } catch (error) {
-      console.error('Failed to initialize auth:', error);
-      // Clear invalid cached user data
-      await removeUserData();
+      // No valid cookie or user not authenticated
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -87,17 +77,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Login user
+   * Cookie is set by server automatically
    */
   const login = async (credentials: LoginRequest) => {
     try {
       setIsLoading(true);
-      const response = await authService.login(credentials);
+      await authService.login(credentials);
       
-      // Fetch user data after login
+      // Fetch user data (cookie is now set)
       const userData = await userService.getCurrentUser();
-      
       setUser(userData);
-      await setUserData(userData);
       
       // Navigation will be handled by useEffect
     } catch (error: any) {
@@ -110,17 +99,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Register new user
+   * Cookie is set by server automatically
    */
   const register = async (userData: RegisterRequest) => {
     try {
       setIsLoading(true);
-      const response = await authService.register(userData);
+      await authService.register(userData);
       
-      // Fetch user data after registration
+      // Fetch user data (cookie is now set)
       const userDataResponse = await userService.getCurrentUser();
-      
       setUser(userDataResponse);
-      await setUserData(userDataResponse);
       
       // Navigation will be handled by useEffect
     } catch (error: any) {
@@ -133,38 +121,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Logout user
+   * Server clears the cookie
    */
   const logout = async () => {
     try {
       setIsLoading(true);
       // Call logout endpoint to clear cookie on server
       await authService.logout();
-      // Clear cached user data
-      await removeUserData();
       setUser(null);
       
       // Navigation will be handled by useEffect
     } catch (error) {
       console.error('Logout failed:', error);
-      // Still clear local data even if API call fails
-      await removeUserData();
+      // Clear user state even if API call fails
       setUser(null);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  /**
-   * Refresh user data
-   */
-  const refreshUser = async () => {
-    try {
-      const userData = await userService.getCurrentUser();
-      setUser(userData);
-      await setUserData(userData);
-    } catch (error) {
-      console.error('Failed to refresh user:', error);
-      throw error;
     }
   };
 
@@ -175,7 +147,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     register,
     logout,
-    refreshUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

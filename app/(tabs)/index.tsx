@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,21 +12,23 @@ import {
   Alert,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { StatusBar as RNStatusBar } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
-import { LinearGradient } from 'expo-linear-gradient';
+import { userService } from '@/services/user.service';
 
 const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen() {
-  const { user, logout, refreshUser, isLoading } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      await refreshUser();
+      // Re-fetch user data (cookie is sent automatically)
+      const userData = await userService.getCurrentUser();
+      // User state is managed by AuthContext
     } catch (error) {
       console.error('Failed to refresh:', error);
     } finally {
@@ -70,7 +72,7 @@ export default function HomeScreen() {
       style={styles.background}
       blurRadius={0}
     >
-      <RNStatusBar barStyle="light-content" />
+      <StatusBar style="light" />
       <View style={styles.container}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}

@@ -18,8 +18,8 @@ class UserService {
    */
   async getCurrentUser(): Promise<User> {
     try {
-      const response = await apiService.get<User>(this.USER_ENDPOINTS.ME);
-      return response;
+      const response = await apiService.get<any>(this.USER_ENDPOINTS.ME);
+      return response.data; // Unwrap data from {data, message, success}
     } catch (error) {
       console.error('Get current user error:', error);
       throw error;
@@ -33,11 +33,11 @@ class UserService {
    */
   async updateProfile(data: Partial<User>): Promise<User> {
     try {
-      const response = await apiService.put<User>(
+      const response = await apiService.put<any>(
         this.USER_ENDPOINTS.UPDATE_PROFILE,
         data
       );
-      return response;
+      return response.data; // Unwrap data from {data, message, success}
     } catch (error) {
       console.error('Update profile error:', error);
       throw error;
