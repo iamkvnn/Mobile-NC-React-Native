@@ -7,7 +7,7 @@
 // User Types
 // ============================================
 
-export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
+export type Gender = 'MALE' | 'FEMALE';
 
 export interface User {
   id: string;
@@ -41,6 +41,11 @@ export interface RegisterRequest {
 export interface VerifyOtpRequest {
   email: string;
   otp: string;
+}
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  newPassword: string;
 }
 
 export interface ResendOtpRequest {

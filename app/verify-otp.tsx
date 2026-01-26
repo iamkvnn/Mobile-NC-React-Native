@@ -13,7 +13,7 @@ export default function VerifyOtpScreen() {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const [timer, setTimer] = useState(90);
-  const { verifyOtp, resendOtp, tempEmail } = useAuth();
+  const { verifyOtp, sendOtp, tempEmail } = useAuth();
   const router = useRouter();
   
   const inputRefs = useRef<Array<TextInput | null>>([]);
@@ -26,7 +26,7 @@ export default function VerifyOtpScreen() {
   }, []);
 
 useEffect(() => {
-    resendOtp();
+    sendOtp();
     inputRefs.current[0]?.focus();
   }, []);
 
@@ -76,7 +76,7 @@ useEffect(() => {
     if (timer > 0) return;
     try {
       setLoading(true);
-      await resendOtp();
+      await sendOtp();
       setTimer(90);
       Alert.alert('Success', 'OTP Resent successfully');
     } catch (error: any) {

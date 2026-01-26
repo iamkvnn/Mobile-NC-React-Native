@@ -16,7 +16,7 @@ interface AuthContextState {
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
   verifyOtp: (otp: string) => Promise<void>;
-  resendOtp: () => Promise<void>;
+  sendOtp: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (isLoading) return;
 
     //const inAuthGroup = segments[0] === '(auth)'; // If you have auth group
-    const inAuthScreen = segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'verify-otp';
+    const inAuthScreen = segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'verify-otp' || segments[0] === 'forgot-password' || segments[0] === 'reset-password';
 
     if (!user && !inAuthScreen) {
       // Redirect to login if not authenticated
@@ -152,12 +152,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   /**
-   * Resend OTP
+   * Send OTP
    */
-  const resendOtp = async () => {
+  const sendOtp = async () => {
       if (!tempEmail) throw new Error('No email found for verification');
       try {
-          await authService.resendOtp({ email: tempEmail });
+          await authService.sendOtp({ email: tempEmail });
       } catch (error) {
           throw error;
       }
@@ -189,7 +189,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     register,
     verifyOtp,
-    resendOtp,
+    sendOtp,
     logout,
   };
 

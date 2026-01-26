@@ -267,16 +267,6 @@ export default function RegisterScreen() {
                         <Text style={styles.genderText}>Female</Text>
                       </BlurView>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.genderButton, gender === 'OTHER' && styles.genderButtonActive]}
-                      onPress={() => setGender('OTHER')}
-                      activeOpacity={0.8}
-                    >
-                      <BlurView intensity={gender === 'OTHER' ? 30 : 20} tint={gender === 'OTHER' ? 'light' : 'dark'} style={styles.genderBlur}>
-                        <Ionicons name="person" size={20} color="#fff" />
-                        <Text style={styles.genderText}>Other</Text>
-                      </BlurView>
-                    </TouchableOpacity>
                   </View>
                 </View>
 

@@ -6,6 +6,7 @@ import {
   VerifyOtpRequest, 
   ResendOtpRequest, 
   RefreshTokenRequest,
+  ResetPasswordRequest,
   Tokens,
   ApiResponse
 } from '@/types/api.types';
@@ -21,7 +22,9 @@ class AuthService {
     LOGOUT: '/auth/logout',
     REFRESH: '/auth/refresh-token',
     VERIFY_OTP: '/auth/verify-otp',
-    RESEND_OTP: '/auth/resend-otp',
+    SEND_OTP: '/auth/send-otp',
+    FORGOT_PASSWORD_INIT: '/auth/forgot-password',
+    RESET_PASSWORD: '/auth/reset-password',
   };
 
   /**
@@ -62,11 +65,33 @@ class AuthService {
   }
 
   /**
-   * Resend OTP
+   * Send OTP
    */
-  async resendOtp(data: ResendOtpRequest): Promise<void> {
+  async sendOtp(data: ResendOtpRequest): Promise<void> {
     await apiService.post(
-      this.AUTH_ENDPOINTS.RESEND_OTP,
+      this.AUTH_ENDPOINTS.SEND_OTP,
+      data
+    );
+  }
+
+  /**
+   * Send forgot password OTP
+   * @param email - User email
+   */
+  async sendForgotPasswordOtp(email: string): Promise<void> {
+    await apiService.post<ApiResponse<void>>(
+      this.AUTH_ENDPOINTS.SEND_OTP,
+      { email }
+    );
+  }
+
+  /**
+   * Reset password
+   * @param data - Reset password data
+   */
+  async resetPassword(data: ResetPasswordRequest): Promise<void> {
+    await apiService.post<ApiResponse<void>>(
+      this.AUTH_ENDPOINTS.RESET_PASSWORD,
       data
     );
   }
