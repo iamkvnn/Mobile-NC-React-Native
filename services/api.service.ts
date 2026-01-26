@@ -1,4 +1,5 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { getToken, getRefreshToken, setToken, setRefreshToken, clearAuthData } from '@/utils/storage';
 
 // API Configuration
 const API_CONFIG = {
@@ -8,7 +9,7 @@ const API_CONFIG = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
-  WITH_CREDENTIALS: true,
+  WITH_CREDENTIALS: false,
 };
 
 /**
@@ -17,16 +18,29 @@ const API_CONFIG = {
  */
 class ApiService {
   private axiosInstance: AxiosInstance;
+  private isRefreshing = false;
+  private failedQueue: any[] = [];
 
   constructor() {
     this.axiosInstance = axios.create({
       baseURL: API_CONFIG.BASE_URL,
       timeout: API_CONFIG.TIMEOUT,
       headers: API_CONFIG.HEADERS,
-      withCredentials: API_CONFIG.WITH_CREDENTIALS, // Enable cookies
     });
 
     this.setupInterceptors();
+  }
+
+  private processQueue(error: any, token: string | null = null) {
+    this.failedQueue.forEach(prom => {
+      if (error) {
+        prom.reject(error);
+      } else {
+        prom.resolve(token);
+      }
+    });
+
+    this.failedQueue = [];
   }
 
   /**
@@ -34,7 +48,12 @@ class ApiService {
    */
   private setupInterceptors() {
     this.axiosInstance.interceptors.request.use(
-      async (config) => {
+      async (config: InternalAxiosRequestConfig) => {
+        const token = await getToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+
         // Log request for debugging (remove in production)
         if (__DEV__) {
           console.log(`🚀 ${config.method?.toUpperCase()} ${config.url}`, config.data);
@@ -57,15 +76,64 @@ class ApiService {
         return response;
       },
       async (error: AxiosError) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
         // Log error for debugging
         if (__DEV__) {
           console.error('❌ API Error:', error.response?.data || error.message);
         }
 
         // Handle 401 - Unauthorized
-        if (error.response?.status === 401) {
-          console.log('⚠️ Unauthorized - Please login again');
+        if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+          if (this.isRefreshing) {
+             return new Promise((resolve, reject) => {
+                this.failedQueue.push({ resolve, reject });
+             }).then(token => {
+                originalRequest.headers.Authorization = 'Bearer ' + token;
+                return this.axiosInstance(originalRequest);
+             }).catch(err => {
+                return Promise.reject(err);
+             });
+          }
+
+          originalRequest._retry = true;
+          this.isRefreshing = true;
+
+          try {
+            const refreshToken = await getRefreshToken();
+
+             if (!refreshToken) {
+                await clearAuthData();
+                throw new Error('No refresh token available');
+             }
+
+             // Call refresh endpoint manually to avoid circular dependency
+             const response = await axios.post(`${API_CONFIG.BASE_URL}/auth/refresh-token`, { 
+                 token: refreshToken 
+             });
+
+             const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+
+             await setToken(accessToken);
+             if (newRefreshToken) {
+                 await setRefreshToken(newRefreshToken);
+             }
+
+             this.axiosInstance.defaults.headers.common['Authorization'] = 'Bearer ' + accessToken;
+             originalRequest.headers.Authorization = 'Bearer ' + accessToken;
+
+             this.processQueue(null, accessToken);
+             
+             return this.axiosInstance(originalRequest);
+          } catch (err) {
+             this.processQueue(err, null);
+             await clearAuthData();
+             return Promise.reject(err);
+          } finally {
+             this.isRefreshing = false;
+          }
         }
+
         return Promise.reject(this.handleError(error));
       }
     );
@@ -82,6 +150,7 @@ class ApiService {
         message: data?.message || 'An error occurred',
         statusCode: error.response.status,
         errors: data?.errors || null,
+        data: data // Ensure data is passed through
       };
     } else if (error.request) {
       // Request made but no response
@@ -89,6 +158,7 @@ class ApiService {
         message: 'Network error. Please check your connection.',
         statusCode: 0,
         errors: null,
+        data: null
       };
     } else {
       // Something else happened
@@ -96,6 +166,7 @@ class ApiService {
         message: error.message || 'An unexpected error occurred',
         statusCode: 0,
         errors: null,
+        data: null
       };
     }
   }
@@ -163,6 +234,7 @@ export interface ApiError {
   message: string;
   statusCode: number;
   errors: any;
+  data: any;
 }
 
 export interface ApiResponse<T = any> {

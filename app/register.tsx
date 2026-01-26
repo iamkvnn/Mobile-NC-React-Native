@@ -101,8 +101,7 @@ export default function RegisterScreen() {
         gender,
       });
       
-      Alert.alert('Success', 'Registration successful!');
-      // Navigation will be handled by AuthContext
+      // Navigation handled by AuthContext (Verify OTP)
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message || 'Please try again');
     } finally {

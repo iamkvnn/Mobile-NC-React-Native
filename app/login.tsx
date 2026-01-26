@@ -64,8 +64,7 @@ export default function LoginScreen() {
         password,
       });
       
-      Alert.alert('Success', 'Login successful!');
-      // Navigation will be handled by AuthContext
+      // Navigation handled by AuthContext (Home or Verify OTP)
     } catch (error: any) {
       Alert.alert('Login Failed', error.message || 'Please check your credentials');
     } finally {

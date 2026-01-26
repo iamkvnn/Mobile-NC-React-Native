@@ -3,6 +3,7 @@ import { useRouter, useSegments } from 'expo-router';
 import { User, LoginRequest, RegisterRequest } from '@/types/api.types';
 import { authService } from '@/services/auth.service';
 import { userService } from '@/services/user.service';
+import { getToken, setToken, setRefreshToken, clearAuthData } from '@/utils/storage';
 
 /**
  * Auth Context State Interface
@@ -11,8 +12,11 @@ interface AuthContextState {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  tempEmail: string | null;
   login: (credentials: LoginRequest) => Promise<void>;
   register: (userData: RegisterRequest) => Promise<void>;
+  verifyOtp: (otp: string) => Promise<void>;
+  resendOtp: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -35,6 +39,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [tempEmail, setTempEmail] = useState<string | null>(null);
   const router = useRouter();
   const segments = useSegments();
 
@@ -47,7 +52,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     if (isLoading) return;
 
-    const inAuthScreen = segments[0] === 'login' || segments[0] === 'register';
+    //const inAuthGroup = segments[0] === '(auth)'; // If you have auth group
+    const inAuthScreen = segments[0] === 'login' || segments[0] === 'register' || segments[0] === 'verify-otp';
 
     if (!user && !inAuthScreen) {
       // Redirect to login if not authenticated
@@ -60,15 +66,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Initialize authentication state
-   * Cookie will be sent automatically - if valid, user data is fetched
    */
   const initializeAuth = async () => {
     try {
-      // Fetch user data from API (cookie is sent automatically)
-      const userData = await userService.getCurrentUser();
-      setUser(userData);
+      const token = await getToken();
+      if (token) {
+        // Fetch user data from API
+        const userData = await userService.getCurrentUser();
+        setUser(userData);
+      } else {
+        setUser(null);
+      }
     } catch (error) {
-      // No valid cookie or user not authenticated
+      // No valid token or user not authenticated
+      await clearAuthData();
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -77,20 +88,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Login user
-   * Cookie is set by server automatically
    */
   const login = async (credentials: LoginRequest) => {
     try {
       setIsLoading(true);
-      await authService.login(credentials);
+      const authData = await authService.login(credentials);
       
-      // Fetch user data (cookie is now set)
-      const userData = await userService.getCurrentUser();
-      setUser(userData);
+      await setToken(authData.token.accessToken);
+      await setRefreshToken(authData.token.refreshToken);
+      setUser(authData.user);
       
-      // Navigation will be handled by useEffect
     } catch (error: any) {
       console.error('Login failed:', error);
+      
+      if (error?.message === 'User email is not verified') {
+          setTempEmail(credentials.email);
+          router.push('/verify-otp'); // Assuming you have this route
+          return;
+      }
+      
       throw new Error(error.message || 'Login failed');
     } finally {
       setIsLoading(false);
@@ -99,18 +115,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Register new user
-   * Cookie is set by server automatically
    */
   const register = async (userData: RegisterRequest) => {
     try {
       setIsLoading(true);
       await authService.register(userData);
       
-      // Fetch user data (cookie is now set)
-      const userDataResponse = await userService.getCurrentUser();
-      setUser(userDataResponse);
+      // After register, we usually expect OTP verification
+      setTempEmail(userData.email);
+      router.push('/verify-otp');
       
-      // Navigation will be handled by useEffect
     } catch (error: any) {
       console.error('Registration failed:', error);
       throw new Error(error.message || 'Registration failed');
@@ -120,20 +134,47 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   /**
+   * Verify OTP
+   */
+  const verifyOtp = async (otp: string) => {
+      if (!tempEmail) throw new Error('No email found for verification');
+      try {
+          setIsLoading(true);
+          // Just call the API to verify. Do not auto-login.
+          await authService.verifyOtp({ email: tempEmail, otp });
+          
+          setTempEmail(null);
+      } catch (error: any) {
+          throw error;
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  /**
+   * Resend OTP
+   */
+  const resendOtp = async () => {
+      if (!tempEmail) throw new Error('No email found for verification');
+      try {
+          await authService.resendOtp({ email: tempEmail });
+      } catch (error) {
+          throw error;
+      }
+  };
+
+  /**
    * Logout user
-   * Server clears the cookie
    */
   const logout = async () => {
     try {
       setIsLoading(true);
-      // Call logout endpoint to clear cookie on server
       await authService.logout();
+      await clearAuthData();
       setUser(null);
-      
-      // Navigation will be handled by useEffect
     } catch (error) {
       console.error('Logout failed:', error);
-      // Clear user state even if API call fails
+      await clearAuthData(); // Ensure local cleanup even if API fails
       setUser(null);
     } finally {
       setIsLoading(false);
@@ -144,8 +185,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     isLoading,
     isAuthenticated: !!user,
+    tempEmail,
     login,
     register,
+    verifyOtp,
+    resendOtp,
     logout,
   };
 

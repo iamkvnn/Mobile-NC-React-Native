@@ -1,5 +1,14 @@
 import { apiService } from './api.service';
-import { LoginRequest, RegisterRequest, AuthResponse } from '@/types/api.types';
+import { 
+  LoginRequest, 
+  RegisterRequest, 
+  AuthData, 
+  VerifyOtpRequest, 
+  ResendOtpRequest, 
+  RefreshTokenRequest,
+  Tokens,
+  ApiResponse
+} from '@/types/api.types';
 
 /**
  * Authentication Service
@@ -10,64 +19,78 @@ class AuthService {
     LOGIN: '/auth/login',
     REGISTER: '/auth/register',
     LOGOUT: '/auth/logout',
-    REFRESH: '/auth/refresh',
+    REFRESH: '/auth/refresh-token',
+    VERIFY_OTP: '/auth/verify-otp',
+    RESEND_OTP: '/auth/resend-otp',
   };
 
   /**
    * Login user
    * @param credentials - Email and password
-   * @returns Authentication response with user data
-   * @note Cookie is automatically set by the server with httpOnly flag
+   * @returns Authentication data
    */
-  async login(credentials: LoginRequest): Promise<AuthResponse> {
-    try {
-      const response = await apiService.post<any>(
-        this.AUTH_ENDPOINTS.LOGIN,
-        credentials
-      );
-
-      // Cookie is set automatically by server in Set-Cookie header
-      // No need to manually store anything on client side
-
-      return response.data; // Unwrap data from {data, message, success}
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
+  async login(credentials: LoginRequest): Promise<AuthData> {
+    const response = await apiService.post<ApiResponse<AuthData>>(
+      this.AUTH_ENDPOINTS.LOGIN,
+      credentials
+    );
+    return response.data;
   }
 
   /**
    * Register new user
    * @param userData - User registration data
-   * @returns Authentication response with token and user data
+   * @returns Authentication data
    */
-  async register(userData: RegisterRequest): Promise<AuthResponse> {
-    try {
-      const response = await apiService.post<any>(
-        this.AUTH_ENDPOINTS.REGISTER,
-        userData
-      );
+  async register(userData: RegisterRequest): Promise<AuthData> {
+    const response = await apiService.post<ApiResponse<AuthData>>(
+      this.AUTH_ENDPOINTS.REGISTER,
+      userData
+    );
+    return response.data;
+  }
 
-      // Cookie is set automatically by server in Set-Cookie header
-      // No need to manually store anything on client side
-      return response.data; // Unwrap data from {data, message, success}
-    } catch (error) {
-      console.error('Registration error:', error);
-      throw error;
-    }
+  /**
+   * Verify OTP
+   */
+  async verifyOtp(data: VerifyOtpRequest): Promise<AuthData> {
+    const response = await apiService.post<ApiResponse<AuthData>>(
+      this.AUTH_ENDPOINTS.VERIFY_OTP,
+      data
+    );
+    return response.data;
+  }
+
+  /**
+   * Resend OTP
+   */
+  async resendOtp(data: ResendOtpRequest): Promise<void> {
+    await apiService.post(
+      this.AUTH_ENDPOINTS.RESEND_OTP,
+      data
+    );
+  }
+
+  /**
+   * Refresh Token
+   */
+  async refreshToken(data: RefreshTokenRequest): Promise<Tokens> {
+    const response = await apiService.post<ApiResponse<Tokens>>(
+      this.AUTH_ENDPOINTS.REFRESH,
+      data
+    );
+    return response.data;
   }
 
   /**
    * Logout user
-   * Clears stored token and calls logout endpoint
    */
   async logout(): Promise<void> {
     try {
-      // Call logout endpoint - server will clear the cookie
       await apiService.post(this.AUTH_ENDPOINTS.LOGOUT);
     } catch (error) {
       console.error('Logout error:', error);
-      throw error;
+      // Even if network fails, client should clear state
     }
   }
 }

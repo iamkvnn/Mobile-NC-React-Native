@@ -13,12 +13,13 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  role: string;
   gender: Gender;
   avatar?: string;
   phoneNumber?: string;
   dateOfBirth?: string;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ============================================
@@ -37,11 +38,28 @@ export interface RegisterRequest {
   gender: Gender;
 }
 
-export interface AuthResponse {
+export interface VerifyOtpRequest {
+  email: string;
+  otp: string;
+}
+
+export interface ResendOtpRequest {
+  email: string;
+  mobile?: boolean;
+}
+
+export interface RefreshTokenRequest {
   token: string;
-  user?: User;
-  refreshToken?: string;
-  expiresIn?: number;
+}
+
+export interface Tokens {
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface AuthData {
+  token: Tokens;
+  user: User;
 }
 
 // ============================================
@@ -57,8 +75,9 @@ export interface ApiSuccessResponse<T = any> {
 export interface ApiErrorResponse {
   success: false;
   message: string;
+  data?: any;
   errors?: Record<string, string[]>;
-  statusCode: number;
+  statusCode?: number;
 }
 
 export type ApiResponse<T = any> = ApiSuccessResponse<T> | ApiErrorResponse;
