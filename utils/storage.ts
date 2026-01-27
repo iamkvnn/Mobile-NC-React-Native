@@ -3,25 +3,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
 /**
- * Storage Keys
+ * Storage Keys for non-Redux data
  */
 const STORAGE_KEYS = {
-  AUTH_TOKEN: 'auth_token',
-  REFRESH_TOKEN: 'refresh_token',
-  USER_DATA: 'user_data',
   THEME: 'theme',
   LANGUAGE: 'language',
+  ONBOARDING_COMPLETED: 'onboarding_completed',
+  BIOMETRIC_ENABLED: 'biometric_enabled',
 } as const;
 
 /**
- * Secure Storage Utility
- * Uses SecureStore for native platforms and AsyncStorage for web
+ * Simplified Storage Utility (for non-Redux data only)
+ * Auth data is now handled by Redux Persist
  */
 class StorageService {
   private isWeb = Platform.OS === 'web';
 
   /**
-   * Save item to secure storage
+   * Save item to storage
    */
   async setItem(key: string, value: string): Promise<void> {
     try {
@@ -37,7 +36,7 @@ class StorageService {
   }
 
   /**
-   * Get item from secure storage
+   * Get item from storage
    */
   async getItem(key: string): Promise<string | null> {
     try {
@@ -53,7 +52,7 @@ class StorageService {
   }
 
   /**
-   * Remove item from secure storage
+   * Remove item from storage
    */
   async removeItem(key: string): Promise<void> {
     try {
@@ -67,102 +66,14 @@ class StorageService {
       throw new Error(`Failed to remove ${key}`);
     }
   }
-
-  /**
-   * Clear all storage
-   */
-  async clear(): Promise<void> {
-    try {
-      const keys = Object.values(STORAGE_KEYS);
-      if (this.isWeb) {
-        await AsyncStorage.multiRemove(keys);
-      } else {
-        await Promise.all(keys.map(key => SecureStore.deleteItemAsync(key)));
-      }
-    } catch (error) {
-      console.error('Error clearing storage:', error);
-      throw new Error('Failed to clear storage');
-    }
-  }
-
-  /**
-   * Save object to storage (JSON stringified)
-   */
-  async setObject<T>(key: string, value: T): Promise<void> {
-    try {
-      const jsonValue = JSON.stringify(value);
-      await this.setItem(key, jsonValue);
-    } catch (error) {
-      console.error(`Error saving object ${key}:`, error);
-      throw new Error(`Failed to save object ${key}`);
-    }
-  }
-
-  /**
-   * Get object from storage (JSON parsed)
-   */
-  async getObject<T>(key: string): Promise<T | null> {
-    try {
-      const jsonValue = await this.getItem(key);
-      return jsonValue != null ? JSON.parse(jsonValue) : null;
-    } catch (error) {
-      console.error(`Error getting object ${key}:`, error);
-      return null;
-    }
-  }
 }
 
 // Create singleton instance
 const storage = new StorageService();
 
 // ============================================
-// Convenience Functions
+// App Settings Management (non-auth data)
 // ============================================
-
-/**
- * Token Management
- */
-export const setToken = (token: string): Promise<void> => {
-  return storage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
-};
-
-export const getToken = (): Promise<string | null> => {
-  return storage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-};
-
-export const removeToken = (): Promise<void> => {
-  return storage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-};
-
-/**
- * Refresh Token Management
- */
-export const setRefreshToken = (token: string): Promise<void> => {
-  return storage.setItem(STORAGE_KEYS.REFRESH_TOKEN, token);
-};
-
-export const getRefreshToken = (): Promise<string | null> => {
-  return storage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-};
-
-export const removeRefreshToken = (): Promise<void> => {
-  return storage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-};
-
-/**
- * User Data Management
- */
-export const setUserData = <T>(data: T): Promise<void> => {
-  return storage.setObject(STORAGE_KEYS.USER_DATA, data);
-};
-
-export const getUserData = <T>(): Promise<T | null> => {
-  return storage.getObject<T>(STORAGE_KEYS.USER_DATA);
-};
-
-export const removeUserData = (): Promise<void> => {
-  return storage.removeItem(STORAGE_KEYS.USER_DATA);
-};
 
 /**
  * Theme Management
@@ -187,14 +98,27 @@ export const getLanguage = (): Promise<string | null> => {
 };
 
 /**
- * Clear all auth data
+ * Onboarding Management
  */
-export const clearAuthData = async (): Promise<void> => {
-  await Promise.all([
-    removeToken(),
-    removeRefreshToken(),
-    removeUserData(),
-  ]);
+export const setOnboardingCompleted = (completed: boolean): Promise<void> => {
+  return storage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, completed.toString());
+};
+
+export const getOnboardingCompleted = async (): Promise<boolean> => {
+  const result = await storage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
+  return result === 'true';
+};
+
+/**
+ * Biometric Settings
+ */
+export const setBiometricEnabled = (enabled: boolean): Promise<void> => {
+  return storage.setItem(STORAGE_KEYS.BIOMETRIC_ENABLED, enabled.toString());
+};
+
+export const getBiometricEnabled = async (): Promise<boolean> => {
+  const result = await storage.getItem(STORAGE_KEYS.BIOMETRIC_ENABLED);
+  return result === 'true';
 };
 
 /**

@@ -1,27 +1,30 @@
-import { View, StyleSheet, TouchableOpacity, Text, ImageBackground, ActivityIndicator } from "react-native";
+import { View, TouchableOpacity, Text, ImageBackground, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { BlurView } from "expo-blur";
 import { StatusBar } from "expo-status-bar";
-import { useAuth } from "@/context/AuthContext";
+import { useAppSelector } from "@/store/hooks";
+import { selectIsAuthenticated, selectIsLoading, selectIsInitialized } from "@/store/slices/authSlice";
 import { useEffect } from "react";
 
 export default function Index() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const isLoading = useAppSelector(selectIsLoading);
+  const isInitialized = useAppSelector(selectIsInitialized);
 
   useEffect(() => {
-    if (!isLoading) {
+    if (isInitialized && !isLoading) {
       if (isAuthenticated) {
         router.replace('/(tabs)');
       }
     }
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, isInitialized, router]);
 
-  if (isLoading) {
+  if (!isInitialized || isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View className="flex-1 justify-center items-center bg-black">
         <ActivityIndicator size="large" color="#8b45ff" />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text className="text-white mt-4 text-base">Loading...</Text>
       </View>
     );
   }
@@ -29,32 +32,37 @@ export default function Index() {
   return (
     <ImageBackground
       source={{ uri: 'https://images.unsplash.com/photo-1557683316-973673baf926?w=1200' }}
-      style={styles.background}
+      className="flex-1"
     >
       <StatusBar style="light" />
-      <View style={styles.container}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Welcome</Text>
-          <Text style={styles.subtitle}>Choose an option to continue</Text>
+      <View className="flex-1 bg-black/40 justify-center items-center">
+        <View className="items-center px-6">
+          <Text className="text-5xl font-bold text-white mb-3 text-center"
+                style={{
+                  textShadowColor: 'rgba(0,0,0,0.3)',
+                  textShadowOffset: { width: 0, height: 2 },
+                  textShadowRadius: 4,
+                }}>Welcome</Text>
+          <Text className="text-lg text-white/80 mb-12 text-center">Choose an option to continue</Text>
 
-          <View style={styles.buttonContainer}>
+          <View className="w-full max-w-xs gap-4">
             <TouchableOpacity
-              style={styles.button}
+              className="rounded-2xl overflow-hidden border border-white/30"
               onPress={() => router.push('/login')}
               activeOpacity={0.8}
             >
-              <BlurView intensity={30} tint="light" style={styles.buttonBlur}>
-                <Text style={styles.buttonText}>Sign In</Text>
+              <BlurView intensity={30} tint="light" className="py-4 px-8 justify-center items-center bg-white/20">
+                <Text className="text-white text-lg font-semibold">Sign In</Text>
               </BlurView>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.button}
+              className="rounded-2xl overflow-hidden border border-white/20"
               onPress={() => router.push('/register')}
               activeOpacity={0.8}
             >
-              <BlurView intensity={20} tint="dark" style={styles.buttonBlurSecondary}>
-                <Text style={styles.buttonText}>Sign Up</Text>
+              <BlurView intensity={20} tint="dark" className="py-4 px-8 justify-center items-center bg-white/10">
+                <Text className="text-white text-lg font-semibold">Sign Up</Text>
               </BlurView>
             </TouchableOpacity>
           </View>
@@ -63,69 +71,3 @@ export default function Index() {
     </ImageBackground>
   );
 }
-
-const styles = StyleSheet.create({
-  background: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
-  },
-  loadingText: {
-    color: '#fff',
-    marginTop: 16,
-    fontSize: 16,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 12,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 48,
-  },
-  buttonContainer: {
-    width: '100%',
-    gap: 16,
-  },
-  button: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  buttonBlur: {
-    paddingVertical: 18,
-    alignItems: 'center',
-    backgroundColor: 'rgba(139,69,255,0.6)',
-  },
-  buttonBlurSecondary: {
-    paddingVertical: 18,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-});

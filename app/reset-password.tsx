@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
@@ -16,8 +15,16 @@ import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+// Services
 import { authService } from '@/services/auth.service';
+
+// Schema & Components
+import { resetPasswordSchema, ResetPasswordFormData } from '@/schemas/auth.schema';
+import { FormInput, SubmitButton } from '@/components/ui';
+import { colors } from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -27,21 +34,30 @@ export default function ResetPasswordScreen() {
   const email = typeof params.email === 'string' ? params.email : '';
 
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
   const [isLoading, setIsLoading] = useState(false);
   const [isResendLoading, setIsResendLoading] = useState(false);
   const [timer, setTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const inputRefs = useRef<Array<TextInput | null>>([]);
 
+  // React Hook Form with Zod validation (for password fields)
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ResetPasswordFormData>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: {
+      otp: '',
+      newPassword: '',
+      confirmPassword: '',
+    },
+  });
+
+  // Timer countdown
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (timer > 0) {
       interval = setInterval(() => {
         setTimer((prev) => prev - 1);
@@ -49,7 +65,9 @@ export default function ResetPasswordScreen() {
     } else {
       setCanResend(true);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [timer]);
 
   const handleOtpChange = (text: string, index: number) => {
@@ -57,13 +75,9 @@ export default function ResetPasswordScreen() {
     newOtp[index] = text;
     setOtp(newOtp);
 
-    // Auto-focus next input
     if (text && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
-    
-    // Auto-focus prev input if backspace (handled partially by onChangeText not sending empty, but generic approach)
-    // Note: React Native TextInput implementation of backspace on empty requires onKeyPress
   };
 
   const handleKeyPress = (e: any, index: number) => {
@@ -75,49 +89,29 @@ export default function ResetPasswordScreen() {
     }
   };
 
-  const handleResetPassword = async () => {
+  const onSubmit = async (data: ResetPasswordFormData) => {
     const otpValue = otp.join('');
     
     if (otpValue.length !== 6) {
-      setError('Please enter the complete 6-digit verification code');
-      return;
-    }
-
-    if (!newPassword || newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match');
+      Alert.alert('Error', 'Please enter the complete 6-digit verification code');
       return;
     }
 
     setIsLoading(true);
-    setError(null);
-
     try {
       await authService.resetPassword({
         email,
         otp: otpValue,
-        newPassword
+        newPassword: data.newPassword,
       });
       
       Alert.alert(
         'Success',
         'Your password has been reset successfully. Please login with your new password.',
-        [
-          {
-            text: 'Login',
-            onPress: () => router.dismissAll() // Navigate back to Login (assuming Login is root of stack or dismisses this stack)
-             // or router.replace('/login')
-          }
-        ]
+        [{ text: 'Login', onPress: () => router.replace('/login') }]
       );
-      router.replace('/login');
-
     } catch (err: any) {
-      setError(err.message || 'Failed to reset password');
+      Alert.alert('Error', err.message || 'Failed to reset password');
     } finally {
       setIsLoading(false);
     }
@@ -127,8 +121,6 @@ export default function ResetPasswordScreen() {
     if (!canResend) return;
     
     setIsResendLoading(true);
-    setError(null);
-    
     try {
       await authService.sendForgotPasswordOtp(email);
       setTimer(60);
@@ -137,7 +129,7 @@ export default function ResetPasswordScreen() {
       inputRefs.current[0]?.focus();
       Alert.alert('Success', 'A new verification code has been sent to your email');
     } catch (err: any) {
-      setError(err.message || 'Failed to resend verification code');
+      Alert.alert('Error', err.message || 'Failed to resend verification code');
     } finally {
       setIsResendLoading(false);
     }
@@ -167,17 +159,19 @@ export default function ResetPasswordScreen() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Ionicons name="chevron-back" size={24} color="#fff" />
+            <Ionicons name="chevron-back" size={24} color={colors.white} />
           </TouchableOpacity>
 
           <BlurView intensity={30} tint="dark" style={styles.glassPanel}>
             <View style={styles.content}>
               <View style={styles.header}>
                 <View style={styles.iconContainer}>
-                  <MaterialIcons name="lock-reset" size={40} color="#fff" />
+                  <MaterialIcons name="lock-reset" size={40} color={colors.white} />
                 </View>
                 <Text style={styles.title}>Reset Password</Text>
-                <Text style={styles.subtitle}>Enter the code sent to {email} and set your new password</Text>
+                <Text style={styles.subtitle}>
+                  Enter the code sent to {email} and set your new password
+                </Text>
               </View>
 
               <View style={styles.form}>
@@ -186,11 +180,8 @@ export default function ResetPasswordScreen() {
                   {otp.map((digit, index) => (
                     <TextInput
                       key={index}
-                      ref={(ref) => {inputRefs.current[index] = ref}}
-                      style={[
-                        styles.otpInput,
-                        digit ? styles.otpInputFilled : null,
-                      ]}
+                      ref={(ref) => { inputRefs.current[index] = ref; }}
+                      style={[styles.otpInput, digit && styles.otpInputFilled]}
                       value={digit}
                       onChangeText={(text) => handleOtpChange(text, index)}
                       onKeyPress={(e) => handleKeyPress(e, index)}
@@ -204,91 +195,44 @@ export default function ResetPasswordScreen() {
 
                 {/* Resend OTP */}
                 <View style={styles.resendContainer}>
-                  <Text style={styles.resendText}>
-                    Didn't receive the code?
-                  </Text>
+                  <Text style={styles.resendText}>Didn't receive the code?</Text>
                   <TouchableOpacity
                     onPress={handleResendOtp}
                     disabled={!canResend || isResendLoading}
-                    style={[styles.resendButton, (!canResend || isResendLoading) && styles.resendButtonDisabled]}
                   >
-                    {isResendLoading ? (
-                      <ActivityIndicator size="small" color="#a78bfa" />
-                    ) : (
-                      <Text style={[styles.resendButtonText, (!canResend) && styles.resendButtonTextDisabled]}>
-                        {canResend ? 'Resend Code' : `Resend in ${timer}s`}
-                      </Text>
-                    )}
+                    <Text style={[styles.resendLink, !canResend && styles.resendLinkDisabled]}>
+                      {canResend ? 'Resend Code' : `Resend in ${timer}s`}
+                    </Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Password Input */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>New Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Enter new password"
-                      placeholderTextColor="#64748b"
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                      secureTextEntry={!showPassword}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                      <Ionicons
-                        name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                        size={20}
-                        color="#94a3b8"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <FormInput
+                  control={control}
+                  name="newPassword"
+                  label="New Password"
+                  placeholder="Enter new password"
+                  icon="lock-closed-outline"
+                  isPassword
+                  error={errors.newPassword?.message}
+                />
 
                 {/* Confirm Password Input */}
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Confirm Password</Text>
-                  <View style={styles.inputWrapper}>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Confirm new password"
-                      placeholderTextColor="#64748b"
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      secureTextEntry={!showConfirmPassword}
-                      autoCapitalize="none"
-                    />
-                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                      <Ionicons
-                        name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-                        size={20}
-                        color="#94a3b8"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                <FormInput
+                  control={control}
+                  name="confirmPassword"
+                  label="Confirm Password"
+                  placeholder="Confirm new password"
+                  icon="lock-closed-outline"
+                  isPassword
+                  error={errors.confirmPassword?.message}
+                />
 
-                {error && <Text style={styles.errorText}>{error}</Text>}
-
-                <TouchableOpacity
-                  onPress={handleResetPassword}
-                  disabled={isLoading}
-                  style={styles.submitButtonContainer}
-                  activeOpacity={0.9}
-                >
-                   <LinearGradient
-                    colors={['#1e293b', '#0f172a']}
-                    style={styles.submitButton}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.buttonText}>Reset Password</Text>
-                    )}
-                  </LinearGradient>
-                </TouchableOpacity>
+                <SubmitButton
+                  title="Reset Password"
+                  onPress={handleSubmit(onSubmit)}
+                  isLoading={isLoading}
+                />
               </View>
             </View>
           </BlurView>
@@ -322,7 +266,7 @@ const styles = StyleSheet.create({
   blobViolet: {
     width: 400,
     height: 400,
-    backgroundColor: '#7c3aed',
+    backgroundColor: colors.primary.DEFAULT,
     top: '20%',
     left: '20%',
   },
@@ -351,13 +295,13 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.glass.background,
   },
   glassPanel: {
     borderRadius: 24,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glass.border,
   },
   content: {
     padding: 24,
@@ -370,22 +314,22 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.glass.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: colors.glass.border,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.white,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: colors.glass.text,
     textAlign: 'center',
     paddingHorizontal: 16,
   },
@@ -396,93 +340,41 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
-  },
-  otpInput: {
-    width: 45,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    textAlign: 'center',
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  otpInputFilled: {
-    borderColor: '#a78bfa',
-    backgroundColor: 'rgba(167, 139, 250, 0.1)',
-  },
-  inputGroup: {
     gap: 8,
   },
-  label: {
-    color: '#e2e8f0',
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    height: 56,
-    paddingHorizontal: 16,
-  },
-  input: {
+  otpInput: {
     flex: 1,
-    color: '#fff',
-    fontSize: 16,
-    height: '100%',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 12,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: colors.glass.background,
+    borderWidth: 1,
+    borderColor: colors.glass.border,
+    color: colors.white,
+    fontSize: 24,
+    fontWeight: 'bold',
     textAlign: 'center',
   },
-  submitButtonContainer: {
-    marginTop: 10,
-  },
-  submitButton: {
-    height: 56,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(51, 65, 85, 0.5)',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  otpInputFilled: {
+    borderColor: colors.primary.DEFAULT,
+    backgroundColor: 'rgba(139, 69, 255, 0.1)',
   },
   resendContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    marginVertical: 10,
+    marginBottom: 8,
   },
   resendText: {
-    color: '#94a3b8',
+    color: colors.glass.text,
     fontSize: 14,
   },
-  resendButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  resendButtonDisabled: {
-    opacity: 0.5,
-  },
-  resendButtonText: {
-    color: '#a78bfa',
-    fontSize: 14,
+  resendLink: {
+    color: colors.primary.DEFAULT,
     fontWeight: '600',
+    fontSize: 14,
   },
-  resendButtonTextDisabled: {
-    color: '#64748b',
+  resendLinkDisabled: {
+    color: colors.glass.text,
   },
 });

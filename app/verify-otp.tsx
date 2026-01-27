@@ -1,23 +1,50 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, Dimensions, Platform, KeyboardAvoidingView } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { useAuth } from '@/context/AuthContext';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useRef, useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Dimensions,
+  Platform,
+  KeyboardAvoidingView,
+  Alert,
+} from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import { Stack, useRouter } from 'expo-router';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+// Redux
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { 
+  verifyOtp as verifyOtpAction, 
+  sendOtp as sendOtpAction,
+  selectIsLoading, 
+  selectTempEmail 
+} from '@/store/slices/authSlice';
+
+// Schema & Components
+import { verifyOtpSchema, VerifyOtpFormData } from '@/schemas/auth.schema';
+import { SubmitButton } from '@/components/ui';
+import { colors } from '@/constants/theme';
 
 const { width } = Dimensions.get('window');
 
 export default function VerifyOtpScreen() {
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [loading, setLoading] = useState(false);
-  const [timer, setTimer] = useState(90);
-  const { verifyOtp, sendOtp, tempEmail } = useAuth();
   const router = useRouter();
+  const dispatch = useAppDispatch();
+  const isLoading = useAppSelector(selectIsLoading);
+  const tempEmail = useAppSelector(selectTempEmail);
   
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [timer, setTimer] = useState(90);
   const inputRefs = useRef<Array<TextInput | null>>([]);
 
+  // Timer countdown
   useEffect(() => {
     const interval = setInterval(() => {
       setTimer((prev) => (prev > 0 ? prev - 1 : 0));
@@ -25,8 +52,11 @@ export default function VerifyOtpScreen() {
     return () => clearInterval(interval);
   }, []);
 
-useEffect(() => {
-    sendOtp();
+  // Send OTP on mount
+  useEffect(() => {
+    if (tempEmail) {
+      dispatch(sendOtpAction(tempEmail));
+    }
     inputRefs.current[0]?.focus();
   }, []);
 
@@ -35,14 +65,8 @@ useEffect(() => {
     newOtp[index] = text;
     setOtp(newOtp);
 
-    // Auto-focus next input
     if (text && index < 5) {
       inputRefs.current[index + 1]?.focus();
-    }
-    
-    // Auto-focus prev input if backspace
-    if (!text && index > 0) {
-      inputRefs.current[index - 1]?.focus(); // This logic usually requires onKeyPress for backspace on empty input
     }
   };
 
@@ -59,30 +83,30 @@ useEffect(() => {
       return;
     }
 
+    if (!tempEmail) {
+      Alert.alert('Error', 'No email found for verification');
+      return;
+    }
+
     try {
-      setLoading(true);
-      await verifyOtp(otpString);
+      await dispatch(verifyOtpAction({ email: tempEmail, otp: otpString })).unwrap();
       Alert.alert('Success', 'Verification successful!', [
         { text: 'OK', onPress: () => router.replace('/login') }
       ]);
     } catch (error: any) {
-      Alert.alert('Verification Failed', error.message || 'Invalid OTP');
-    } finally {
-      setLoading(false);
+      Alert.alert('Verification Failed', error?.message || 'Invalid OTP');
     }
   };
 
   const handleResend = async () => {
-    if (timer > 0) return;
+    if (timer > 0 || !tempEmail) return;
     try {
-      setLoading(true);
-      await sendOtp();
+      await dispatch(sendOtpAction(tempEmail)).unwrap();
       setTimer(90);
+      setOtp(['', '', '', '', '', '']);
       Alert.alert('Success', 'OTP Resent successfully');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to resend OTP');
-    } finally {
-      setLoading(false);
+      Alert.alert('Error', error?.message || 'Failed to resend OTP');
     }
   };
 
@@ -115,19 +139,19 @@ useEffect(() => {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={24} color="rgba(255,255,255,0.9)" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>XÁC MINH</Text>
+          <Text style={styles.headerTitle}>VERIFY</Text>
           <View style={{ width: 40 }} />
         </View>
 
         <View style={styles.content}>
           <BlurView intensity={20} tint="dark" style={styles.glassCard}>
             <View style={styles.iconContainer}>
-              <MaterialIcons name="lock-person" size={32} color="white" />
+              <MaterialIcons name="lock-person" size={32} color={colors.white} />
             </View>
 
-            <Text style={styles.title}>Xác nhận mã OTP</Text>
+            <Text style={styles.title}>Verify OTP</Text>
             <Text style={styles.subtitle}>
-              Chúng tôi đã gửi mã gồm 6 chữ số đến email{'\n'}
+              We've sent a 6-digit code to{'\n'}
               <Text style={styles.boldText}>{maskedEmail}</Text>
             </Text>
 
@@ -136,7 +160,7 @@ useEffect(() => {
                 <TextInput
                   key={index}
                   ref={(ref) => { inputRefs.current[index] = ref; }}
-                  style={styles.otpInput}
+                  style={[styles.otpInput, digit && styles.otpInputFilled]}
                   value={digit}
                   onChangeText={(text) => handleOtpChange(text, index)}
                   onKeyPress={(e) => handleKeyPress(e, index)}
@@ -144,42 +168,32 @@ useEffect(() => {
                   maxLength={1}
                   selectTextOnFocus
                   textAlign="center"
-                  editable={!loading}
+                  editable={!isLoading}
                 />
               ))}
             </View>
 
-            <TouchableOpacity
-              style={[styles.verifyButton, loading && styles.disabledButton]}
+            <SubmitButton
+              title="Verify"
               onPress={handleVerify}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-               {loading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <View style={styles.verifyButtonContent}>
-                  <Text style={styles.verifyButtonText}>Xác minh</Text>
-                  <MaterialIcons name="arrow-forward" size={20} color="rgba(255,255,255,0.7)" />
-                </View>
-              )}
-            </TouchableOpacity>
+              isLoading={isLoading}
+            />
 
             <View style={styles.resendContainer}>
               <View style={styles.timerContainer}>
-                <Ionicons name="timer-outline" size={18} color="rgba(255,255,255,0.9)" />
+                <Ionicons name="timer-outline" size={18} color={colors.glass.text} />
                 <Text style={styles.timerText}>
                   00:{timer.toString().padStart(2, '0')}
                 </Text>
               </View>
 
               <Text style={styles.resendText}>
-                Bạn không nhận được mã?{' '}
+                Didn't receive the code?{' '}
                 <Text 
                   style={[styles.resendLink, timer > 0 && styles.resendLinkDisabled]} 
                   onPress={handleResend}
                 >
-                  Gửi lại mã
+                  Resend Code
                 </Text>
               </Text>
             </View>
@@ -210,17 +224,17 @@ const styles = StyleSheet.create({
   blob1: {
     top: -100,
     left: -100,
-    backgroundColor: '#a78bfa', // violet-400
+    backgroundColor: '#a78bfa',
   },
   blob2: {
     bottom: -100,
     right: -100,
-    backgroundColor: '#60a5fa', // blue-400
+    backgroundColor: '#60a5fa',
   },
   blob3: {
     top: '40%',
     left: '40%',
-    backgroundColor: '#e879f9', // fuchsia-400
+    backgroundColor: '#e879f9',
     width: 400,
     height: 400,
   },
@@ -240,14 +254,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: colors.glass.background,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glass.border,
   },
   headerTitle: {
-    color: 'rgba(255,255,255,0.8)',
+    color: colors.glass.text,
     fontSize: 14,
     fontWeight: '600',
     letterSpacing: 1,
@@ -265,124 +279,84 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: colors.glass.border,
   },
   iconContainer: {
     width: 64,
     height: 64,
-    borderRadius: 24, // Rounded-2xl
-    backgroundColor: 'rgba(255,255,255,0.1)', // Simplification of gradient
+    borderRadius: 24,
+    backgroundColor: colors.glass.background,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: colors.glass.border,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: 'white',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: colors.white,
     marginBottom: 12,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.glass.text,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 32,
     maxWidth: 280,
   },
   boldText: {
-    color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: colors.white,
   },
   otpContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 32,
+    justifyContent: 'space-between',
     width: '100%',
+    marginBottom: 32,
+    gap: 8,
   },
   otpInput: {
-    width: 48,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    flex: 1,
+    height: 56,
+    borderRadius: 12,
+    backgroundColor: colors.glass.background,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: colors.glass.border,
+    color: colors.white,
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
   },
-  verifyButton: {
-    width: '100%',
-    height: 56,
-    borderRadius: 16,
-    backgroundColor: '#334155', // fallback
-    overflow: 'hidden',
-    marginBottom: 32,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  verifyButtonContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    // Gradient simulation
-    backgroundColor: '#1e293b', 
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  verifyButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
+  otpInputFilled: {
+    borderColor: colors.primary.DEFAULT,
+    backgroundColor: 'rgba(139, 69, 255, 0.1)',
   },
   resendContainer: {
+    marginTop: 24,
     alignItems: 'center',
-    gap: 20,
-    width: '100%',
+    gap: 12,
   },
   timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    gap: 6,
   },
   timerText: {
-    color: 'white',
-    fontFamily: Platform.select({ ios: 'Courier', android: 'monospace' }),
-    fontWeight: '600',
-    letterSpacing: 1,
-    fontSize: 14,
-  },
-  resendText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.glass.text,
     fontSize: 14,
     fontWeight: '500',
   },
+  resendText: {
+    color: colors.glass.text,
+    fontSize: 14,
+  },
   resendLink: {
-    color: 'white',
-    fontWeight: 'bold',
-    textDecorationLine: 'underline',
+    color: colors.primary.DEFAULT,
+    fontWeight: '600',
   },
   resendLinkDisabled: {
-    color: 'rgba(255,255,255,0.3)',
-    textDecorationLine: 'none',
+    color: colors.glass.text,
   },
 });

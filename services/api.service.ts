@@ -1,5 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError, InternalAxiosRequestConfig } from 'axios';
-import { getToken, getRefreshToken, setToken, setRefreshToken, clearAuthData } from '@/utils/storage';
+import { getAccessToken, getRefreshTokenFromStore, updateTokens, clearAuthState } from '@/utils/storeHelpers';
 
 // API Configuration
 const API_CONFIG = {
@@ -49,7 +49,7 @@ class ApiService {
   private setupInterceptors() {
     this.axiosInstance.interceptors.request.use(
       async (config: InternalAxiosRequestConfig) => {
-        const token = await getToken();
+        const token = getAccessToken();
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -100,10 +100,10 @@ class ApiService {
           this.isRefreshing = true;
 
           try {
-            const refreshToken = await getRefreshToken();
+            const refreshToken = getRefreshTokenFromStore();
 
              if (!refreshToken) {
-                await clearAuthData();
+                clearAuthState();
                 throw new Error('No refresh token available');
              }
 
@@ -114,11 +114,8 @@ class ApiService {
 
              const { accessToken, refreshToken: newRefreshToken } = response.data.data;
 
-             await setToken(accessToken);
-             if (newRefreshToken) {
-                 await setRefreshToken(newRefreshToken);
-             }
-
+             updateTokens(accessToken, newRefreshToken || refreshToken);
+             
              this.axiosInstance.defaults.headers.common['Authorization'] = 'Bearer ' + accessToken;
              originalRequest.headers.Authorization = 'Bearer ' + accessToken;
 
@@ -127,7 +124,7 @@ class ApiService {
              return this.axiosInstance(originalRequest);
           } catch (err) {
              this.processQueue(err, null);
-             await clearAuthData();
+             clearAuthState();
              return Promise.reject(err);
           } finally {
              this.isRefreshing = false;

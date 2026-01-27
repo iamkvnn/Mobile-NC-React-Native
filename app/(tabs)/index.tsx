@@ -14,13 +14,16 @@ import {
 import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '@/context/AuthContext';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { selectUser, selectIsLoading, logoutUser } from '@/store/slices/authSlice';
 import { userService } from '@/services/user.service';
 
 const { width, height } = Dimensions.get('window');
 
 export default function HomeScreen() {
-  const { user, logout, isLoading } = useAuth();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector(selectUser);
+  const isLoading = useAppSelector(selectIsLoading);
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
@@ -28,7 +31,7 @@ export default function HomeScreen() {
     try {
       // Re-fetch user data (cookie is sent automatically)
       const userData = await userService.getCurrentUser();
-      // User state is managed by AuthContext
+      // User state is managed by Redux
     } catch (error) {
       console.error('Failed to refresh:', error);
     } finally {
@@ -47,7 +50,7 @@ export default function HomeScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await logout();
+              await dispatch(logoutUser()).unwrap();
             } catch (error) {
               console.error('Logout error:', error);
             }
