@@ -221,7 +221,28 @@ class ApiService {
   getInstance(): AxiosInstance {
     return this.axiosInstance;
   }
-}
+  /**
+   * Get base URL for direct fetch requests
+   */
+  getBaseURL(): string {
+    return API_CONFIG.BASE_URL;
+  }
+
+  /**
+   * Get auth headers for direct fetch requests
+   */
+  getAuthHeaders(): Record<string, string> {
+    const token = getAccessToken();
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    return headers;
+  }}
 
 // Export singleton instance
 export const apiService = new ApiService();

@@ -15,7 +15,7 @@ export interface User {
   email: string;
   role: string;
   gender: Gender;
-  avatar?: string;
+  avatarUrl?: string;
   phoneNumber?: string;
   dateOfBirth?: string;
   createdAt?: string;
@@ -46,6 +46,33 @@ export interface ResetPasswordRequest {
   email: string;
   otp: string;
   newPassword: string;
+}
+
+export interface ChangePasswordRequest {
+  email: string;
+  otp: string;
+  oldPassword: string;
+  newPassword: string;
+}
+
+export interface ChangeEmailRequest {
+  oldEmail: string;
+  otp: string;
+  newEmail: string;
+}
+
+export interface UpdateUserRequest {
+  name?: string;
+  gender?: Gender;
+}
+
+export interface UpdateUserWithAvatarRequest extends UpdateUserRequest {
+  avatar?: File | string; // File for upload, string for URL
+}
+
+export interface UpdateUserFormData {
+  user: UpdateUserRequest;
+  avatar?: File;
 }
 
 export interface ResendOtpRequest {

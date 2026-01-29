@@ -129,6 +129,47 @@ export const sendOtp = createAsyncThunk(
 );
 
 /**
+ * Update user profile
+ */
+export const updateUserProfile = createAsyncThunk(
+  'auth/updateProfile',
+  async (data: { id: string; name: string; gender: string }, { rejectWithValue }) => {
+    try {
+      const { userService } = require('@/services/user.service');
+      const updatedUser = await userService.updateUser(data.id, {
+        name: data.name,
+        gender: data.gender as any,
+      });
+      return updatedUser;
+    } catch (error: any) {
+      return rejectWithValue({ message: error.message || 'Update profile failed' });
+    }
+  }
+);
+
+/**
+ * Update user profile with avatar
+ */
+export const updateUserProfileWithAvatar = createAsyncThunk(
+  'auth/updateProfileWithAvatar', 
+  async (data: { id: string; name: string; gender: string; avatar?: File }, { rejectWithValue }) => {
+    try {
+      const { userService } = require('@/services/user.service');
+      const updatedUser = await userService.updateUserWithAvatar(data.id, {
+        user: {
+          name: data.name,
+          gender: data.gender as any,
+        },
+        avatar: data.avatar,
+      });
+      return updatedUser;
+    } catch (error: any) {
+      return rejectWithValue({ message: error.message || 'Update profile with avatar failed' });
+    }
+  }
+);
+
+/**
  * Logout user
  */
 export const logoutUser = createAsyncThunk(
@@ -168,6 +209,11 @@ const authSlice = createSlice({
     setTokens: (state, action: PayloadAction<{ accessToken: string; refreshToken: string }>) => {
       state.accessToken = action.payload.accessToken;
       state.refreshToken = action.payload.refreshToken;
+    },
+    updateUser: (state, action: PayloadAction<Partial<User>>) => {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+      }
     },
   },
   extraReducers: (builder) => {
@@ -238,6 +284,32 @@ const authSlice = createSlice({
       .addCase(sendOtp.rejected, (state, action: any) => {
         state.error = action.payload?.message || 'Failed to send OTP';
       })
+      // Update Profile
+      .addCase(updateUserProfile.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateUserProfile.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload;
+      })
+      .addCase(updateUserProfile.rejected, (state, action: any) => {
+        state.isLoading = false;
+        state.error = action.payload?.message || 'Update profile failed';
+      })
+      // Update Profile with Avatar
+      .addCase(updateUserProfileWithAvatar.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateUserProfileWithAvatar.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload;
+      })
+      .addCase(updateUserProfileWithAvatar.rejected, (state, action: any) => {
+        state.isLoading = false;
+        state.error = action.payload?.message || 'Update profile with avatar failed';
+      })
       // Logout
       .addCase(logoutUser.pending, (state) => {
         state.isLoading = true;
@@ -260,7 +332,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { setTempEmail, clearError, resetAuth, setTokens } = authSlice.actions;
+export const { setTempEmail, clearError, resetAuth, setTokens, updateUser } = authSlice.actions;
 
 // Selectors
 export const selectUser = (state: { auth: AuthState }) => state.auth.user;
