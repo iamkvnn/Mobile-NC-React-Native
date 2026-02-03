@@ -1,4 +1,4 @@
-import { apiService } from './api.service';
+import { authApiService } from './api.service.factory';
 import { 
   LoginRequest, 
   RegisterRequest, 
@@ -10,7 +10,8 @@ import {
   ChangePasswordRequest,
   ChangeEmailRequest,
   Tokens,
-  ApiResponse
+  ApiResponse,
+  LoginApiResponse
 } from '@/types/api.types';
 
 /**
@@ -36,10 +37,10 @@ class AuthService {
   /**
    * Login user
    * @param credentials - Email and password
-   * @returns Authentication data
+   * @returns Token data only (no user data)
    */
-  async login(credentials: LoginRequest): Promise<AuthData> {
-    const response = await apiService.post<ApiResponse<AuthData>>(
+  async login(credentials: LoginRequest): Promise<LoginApiResponse> {
+    const response = await authApiService.post<ApiResponse<LoginApiResponse>>(
       this.AUTH_ENDPOINTS.LOGIN,
       credentials
     );
@@ -49,10 +50,10 @@ class AuthService {
   /**
    * Register new user
    * @param userData - User registration data
-   * @returns Authentication data
+   * @returns Token data only (registration might auto-login)
    */
-  async register(userData: RegisterRequest): Promise<AuthData> {
-    const response = await apiService.post<ApiResponse<AuthData>>(
+  async register(userData: RegisterRequest): Promise<LoginApiResponse | void> {
+    const response = await authApiService.post<ApiResponse<LoginApiResponse | void>>(
       this.AUTH_ENDPOINTS.REGISTER,
       userData
     );
@@ -62,8 +63,8 @@ class AuthService {
   /**
    * Verify OTP
    */
-  async verifyOtp(data: VerifyOtpRequest): Promise<AuthData> {
-    const response = await apiService.post<ApiResponse<AuthData>>(
+  async verifyOtp(data: VerifyOtpRequest): Promise<LoginApiResponse> {
+    const response = await authApiService.post<ApiResponse<LoginApiResponse>>(
       this.AUTH_ENDPOINTS.VERIFY_OTP,
       data
     );
@@ -74,7 +75,7 @@ class AuthService {
    * Send OTP
    */
   async sendOtp(data: ResendOtpRequest): Promise<void> {
-    await apiService.post(
+    await authApiService.post(
       this.AUTH_ENDPOINTS.SEND_OTP,
       data
     );
@@ -85,7 +86,7 @@ class AuthService {
    * @param email - User email
    */
   async sendForgotPasswordOtp(email: string): Promise<void> {
-    await apiService.post<ApiResponse<void>>(
+    await authApiService.post<ApiResponse<void>>(
       this.AUTH_ENDPOINTS.SEND_OTP,
       { email }
     );
@@ -96,7 +97,7 @@ class AuthService {
    * @param data - Reset password data
    */
   async resetPassword(data: ResetPasswordRequest): Promise<void> {
-    await apiService.post<ApiResponse<void>>(
+    await authApiService.post<ApiResponse<void>>(
       this.AUTH_ENDPOINTS.RESET_PASSWORD,
       data
     );
@@ -106,7 +107,7 @@ class AuthService {
    * Refresh Token
    */
   async refreshToken(data: RefreshTokenRequest): Promise<Tokens> {
-    const response = await apiService.post<ApiResponse<Tokens>>(
+    const response = await authApiService.post<ApiResponse<Tokens>>(
       this.AUTH_ENDPOINTS.REFRESH,
       data
     );
@@ -118,7 +119,7 @@ class AuthService {
    */
   async logout(): Promise<void> {
     try {
-      await apiService.post(this.AUTH_ENDPOINTS.LOGOUT);
+      await authApiService.post(this.AUTH_ENDPOINTS.LOGOUT);
     } catch (error) {
       console.error('Logout error:', error);
       // Even if network fails, client should clear state
@@ -131,7 +132,7 @@ class AuthService {
    * @param email - User email
    */
   async sendChangePasswordOtp(email: string): Promise<void> {
-    await apiService.post(this.AUTH_ENDPOINTS.SEND_CHANGE_PASSWORD_OTP, { email });
+    await authApiService.post(this.AUTH_ENDPOINTS.SEND_CHANGE_PASSWORD_OTP, { email });
   }
 
   /**
@@ -140,7 +141,7 @@ class AuthService {
    * @param data - Change password data
    */
   async changePassword(data: ChangePasswordRequest): Promise<void> {
-    await apiService.post(this.AUTH_ENDPOINTS.CHANGE_PASSWORD, data);
+    await authApiService.post(this.AUTH_ENDPOINTS.CHANGE_PASSWORD, data);
   }
 
   /**
@@ -149,7 +150,7 @@ class AuthService {
    * @param email - Current user email
    */
   async sendChangeEmailOtp(email: string): Promise<void> {
-    await apiService.post(this.AUTH_ENDPOINTS.SEND_CHANGE_EMAIL_OTP, { email });
+    await authApiService.post(this.AUTH_ENDPOINTS.SEND_CHANGE_EMAIL_OTP, { email });
   }
 
   /**
@@ -158,7 +159,7 @@ class AuthService {
    * @param data - Change email data
    */
   async changeEmail(data: ChangeEmailRequest): Promise<void> {
-    await apiService.post(this.AUTH_ENDPOINTS.CHANGE_EMAIL, data);
+    await authApiService.post(this.AUTH_ENDPOINTS.CHANGE_EMAIL, data);
   }
 }
 

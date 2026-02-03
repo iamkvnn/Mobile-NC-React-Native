@@ -57,14 +57,25 @@ export const initializeAuth = createAsyncThunk(
  */
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async (credentials: LoginRequest, { rejectWithValue }) => {
+  async (credentials: LoginRequest, { rejectWithValue, dispatch }) => {
     try {
       const { authService } = require('@/services/auth.service');
-      const authData = await authService.login(credentials);
+      const { userService } = require('@/services/user.service');
+      const { updateTokens } = require('@/utils/storeHelpers');
+      
+      // Step 1: Login to get tokens
+      const tokenData = await authService.login(credentials);
+      
+      // Step 2: Save tokens to store immediately so interceptor can use them
+      updateTokens(tokenData.accessToken, tokenData.refreshToken);
+      
+      // Step 3: Get user data with the tokens (now available in interceptor)
+      const userData = await userService.getCurrentUser();
+      
       return {
-        user: authData.user,
-        accessToken: authData.token.accessToken,
-        refreshToken: authData.token.refreshToken,
+        user: userData,
+        accessToken: tokenData.accessToken,
+        refreshToken: tokenData.refreshToken,
       };
     } catch (error: any) {
       // Handle unverified email case
@@ -88,8 +99,26 @@ export const registerUser = createAsyncThunk(
   async (userData: RegisterRequest, { rejectWithValue }) => {
     try {
       const { authService } = require('@/services/auth.service');
-      await authService.register(userData);
-      return userData.email; // Return email for OTP verification
+      const result = await authService.register(userData);
+      
+      // If registration returns tokens (auto-login), return those
+      if (result && 'accessToken' in result) {
+        const { userService } = require('@/services/user.service');
+        const { updateTokens } = require('@/utils/storeHelpers');
+        
+        // Save tokens to store immediately so interceptor can use them
+        updateTokens(result.accessToken, result.refreshToken);
+        
+        const user = await userService.getCurrentUser();
+        return {
+          user,
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+        };
+      }
+      
+      // If registration requires verification, return email
+      return userData.email;
     } catch (error: any) {
       return rejectWithValue({ message: error.message || 'Registration failed' });
     }
@@ -104,8 +133,23 @@ export const verifyOtp = createAsyncThunk(
   async ({ email, otp }: { email: string; otp: string }, { rejectWithValue }) => {
     try {
       const { authService } = require('@/services/auth.service');
-      await authService.verifyOtp({ email, otp });
-      return true;
+      const { userService } = require('@/services/user.service');
+      const { updateTokens } = require('@/utils/storeHelpers');
+      
+      // Get tokens from OTP verification
+      const tokenData = await authService.verifyOtp({ email, otp });
+      
+      // Save tokens to store immediately so interceptor can use them
+      updateTokens(tokenData.accessToken, tokenData.refreshToken);
+      
+      // Get user data
+      const userData = await userService.getCurrentUser();
+      
+      return {
+        user: userData,
+        accessToken: tokenData.accessToken,
+        refreshToken: tokenData.refreshToken,
+      };
     } catch (error: any) {
       return rejectWithValue({ message: error.message || 'OTP verification failed' });
     }
@@ -124,6 +168,22 @@ export const sendOtp = createAsyncThunk(
       return true;
     } catch (error: any) {
       return rejectWithValue({ message: error.message || 'Failed to send OTP' });
+    }
+  }
+);
+
+/**
+ * Fetch current user data
+ */
+export const fetchCurrentUser = createAsyncThunk(
+  'auth/fetchCurrentUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const { userService } = require('@/services/user.service');
+      const userData = await userService.getCurrentUser();
+      return userData;
+    } catch (error: any) {
+      return rejectWithValue({ message: error.message || 'Failed to fetch user data' });
     }
   }
 );
@@ -261,7 +321,18 @@ const authSlice = createSlice({
       })
       .addCase(registerUser.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.tempEmail = action.payload;
+        
+        // If registration returns user data (auto-login)
+        if (action.payload && typeof action.payload === 'object' && 'user' in action.payload) {
+          state.user = action.payload.user;
+          state.accessToken = action.payload.accessToken;
+          state.refreshToken = action.payload.refreshToken;
+          state.isAuthenticated = true;
+          state.tempEmail = null;
+        } else {
+          // If registration requires email verification
+          state.tempEmail = action.payload as string;
+        }
       })
       .addCase(registerUser.rejected, (state, action: any) => {
         state.isLoading = false;
@@ -272,8 +343,12 @@ const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(verifyOtp.fulfilled, (state) => {
+      .addCase(verifyOtp.fulfilled, (state, action) => {
         state.isLoading = false;
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
         state.tempEmail = null;
       })
       .addCase(verifyOtp.rejected, (state, action: any) => {
@@ -309,6 +384,20 @@ const authSlice = createSlice({
       .addCase(updateUserProfileWithAvatar.rejected, (state, action: any) => {
         state.isLoading = false;
         state.error = action.payload?.message || 'Update profile with avatar failed';
+      })
+      // Fetch Current User
+      .addCase(fetchCurrentUser.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchCurrentUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload;
+        state.isAuthenticated = true;
+      })
+      .addCase(fetchCurrentUser.rejected, (state, action: any) => {
+        state.isLoading = false;
+        state.error = action.payload?.message || 'Failed to fetch user data';
       })
       // Logout
       .addCase(logoutUser.pending, (state) => {

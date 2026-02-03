@@ -10,23 +10,42 @@ export interface Course {
   id: string;
   title: string;
   description: string;
-  thumbnail: string;
-  instructor: string;
-  instructorAvatar?: string;
+  category?: string | null;
   price: number;
+  duration: number; // duration in minutes
+  // Optional fields for extended course info
+  thumbnail?: string;
+  instructor?: string;
+  instructorAvatar?: string;
   originalPrice?: number;
-  rating: number;
-  totalReviews: number;
-  totalStudents: number;
-  duration: string; // e.g., "12h 30m"
-  totalLessons: number;
-  level: CourseLevel;
-  category: CourseCategory;
-  tags: string[];
+  rating?: number;
+  totalReviews?: number;
+  totalStudents?: number;
+  totalLessons?: number;
+  level?: CourseLevel;
+  tags?: string[];
   isFeatured?: boolean;
   isNew?: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CoursesResponse {
+  success: boolean;
+  message: string;
+  data: Course[];
+  meta: {
+    page: number;
+    limit: number;
+    totalElements: number;
+    totalPages: number;
+  };
+}
+
+export interface CourseDetailResponse {
+  success: boolean;
+  message: string;
+  data: Course;
 }
 
 export interface CourseFilters {
@@ -38,4 +57,14 @@ export interface CourseFilters {
     max: number;
   };
   sortBy?: 'popular' | 'newest' | 'price_low' | 'price_high' | 'rating';
+}
+
+export interface CourseSearchParams {
+  query?: string;
+  page?: number;
+  size?: number;
+  category?: string;
+  minPrice?: number;
+  maxPrice?: number;
+  sortBy?: string;
 }

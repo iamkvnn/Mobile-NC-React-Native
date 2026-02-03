@@ -1,4 +1,4 @@
-import { apiService } from './api.service';
+import { userApiService } from './api.service.factory';
 import { User, UpdateUserRequest, UpdateUserFormData } from '@/types/api.types';
 
 /**
@@ -17,7 +17,7 @@ class UserService {
    */
   async getCurrentUser(): Promise<User> {
     try {
-      const response = await apiService.get<any>(this.USER_ENDPOINTS.ME);
+      const response = await userApiService.get<any>(this.USER_ENDPOINTS.ME);
       return response.data;
     } catch (error) {
       console.error('Get current user error:', error);
@@ -34,7 +34,7 @@ class UserService {
    */
   async updateUser(id: string, data: UpdateUserRequest): Promise<User> {
     try {
-      const response = await apiService.put<any>(
+      const response = await userApiService.put<any>(
         this.USER_ENDPOINTS.UPDATE_USER(id),
         data
       );
@@ -63,25 +63,18 @@ class UserService {
         formData.append('avatar', data.avatar);
       }
 
-      const response = await fetch(
-        `${apiService.getBaseURL()}${this.USER_ENDPOINTS.UPDATE_USER(id)}`,
+      // Use userApiService's axios instance to make the request
+      const response = await userApiService.getAxiosInstance().put(
+        this.USER_ENDPOINTS.UPDATE_USER(id),
+        formData,
         {
-          method: 'PUT',
           headers: {
-            ...apiService.getAuthHeaders(),
-            // Don't set Content-Type for FormData, let browser set it with boundary
+            'Content-Type': 'multipart/form-data',
           },
-          body: formData,
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update user');
-      }
-
-      const result = await response.json();
-      return result.data;
+      return response.data.data;
     } catch (error) {
       console.error('Update user with avatar error:', error);
       throw error;

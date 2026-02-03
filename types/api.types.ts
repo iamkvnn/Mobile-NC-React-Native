@@ -89,9 +89,20 @@ export interface Tokens {
   refreshToken: string;
 }
 
+export interface LoginResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
 export interface AuthData {
   token: Tokens;
   user: User;
+}
+
+// Response from new login API
+export interface LoginApiResponse {
+  accessToken: string;
+  refreshToken: string;
 }
 
 // ============================================
@@ -162,4 +173,28 @@ export interface RequestConfig {
   headers?: Record<string, string>;
   timeout?: number;
   retries?: number;
+}
+
+// ============================================
+// Course API Types
+// ============================================
+
+export interface CourseApiMeta {
+  page: number;
+  limit: number;
+  totalElements: number;
+  totalPages: number;
+}
+
+export interface CourseListResponse<T = any> {
+  success: boolean;
+  message: string;
+  data: T[];
+  meta: CourseApiMeta;
+}
+
+export interface SingleCourseResponse<T = any> {
+  success: boolean;
+  message: string;
+  data: T;
 }
