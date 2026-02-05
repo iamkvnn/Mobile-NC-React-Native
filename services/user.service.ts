@@ -1,5 +1,5 @@
-import { userApiService } from './api.service.factory';
 import { User, UpdateUserRequest, UpdateUserFormData } from '@/types/api.types';
+import { apiService } from './api.service';
 
 /**
  * User Service
@@ -17,7 +17,7 @@ class UserService {
    */
   async getCurrentUser(): Promise<User> {
     try {
-      const response = await userApiService.get<any>(this.USER_ENDPOINTS.ME);
+      const response = await apiService.get<any>(this.USER_ENDPOINTS.ME);
       return response.data;
     } catch (error) {
       console.error('Get current user error:', error);
@@ -34,7 +34,7 @@ class UserService {
    */
   async updateUser(id: string, data: UpdateUserRequest): Promise<User> {
     try {
-      const response = await userApiService.put<any>(
+      const response = await apiService.put<any>(
         this.USER_ENDPOINTS.UPDATE_USER(id),
         data
       );
@@ -63,8 +63,7 @@ class UserService {
         formData.append('avatar', data.avatar);
       }
 
-      // Use userApiService's axios instance to make the request
-      const response = await userApiService.getAxiosInstance().put(
+      const response = await apiService.put(
         this.USER_ENDPOINTS.UPDATE_USER(id),
         formData,
         {
@@ -74,7 +73,7 @@ class UserService {
         }
       );
 
-      return response.data.data;
+      return response.data;
     } catch (error) {
       console.error('Update user with avatar error:', error);
       throw error;

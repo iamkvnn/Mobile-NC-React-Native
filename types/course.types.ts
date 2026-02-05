@@ -10,15 +10,20 @@ export interface Course {
   id: string;
   title: string;
   description: string;
-  category?: string | null;
+  category: string;
   price: number;
+  discountedPrice: number;
+  rating: number;
+  enrollmentCount: number;
+  isPublished: boolean;
+  isInSubscription: boolean;
   duration: number; // duration in minutes
+  createdAt: string;
+  updatedAt: string;
   // Optional fields for extended course info
   thumbnail?: string;
   instructor?: string;
   instructorAvatar?: string;
-  originalPrice?: number;
-  rating?: number;
   totalReviews?: number;
   totalStudents?: number;
   totalLessons?: number;
@@ -26,8 +31,6 @@ export interface Course {
   tags?: string[];
   isFeatured?: boolean;
   isNew?: boolean;
-  createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface CoursesResponse {
@@ -63,8 +66,16 @@ export interface CourseSearchParams {
   query?: string;
   page?: number;
   size?: number;
-  category?: string;
-  minPrice?: number;
-  maxPrice?: number;
-  sortBy?: string;
+  sort?: string; // JSON stringified sort object like {"createdAt":"desc"}
+}
+
+export interface Category {
+  id: string;
+  name: string;
+}
+
+export interface CategoriesResponse {
+  success: boolean;
+  message: string;
+  data: Category[];
 }

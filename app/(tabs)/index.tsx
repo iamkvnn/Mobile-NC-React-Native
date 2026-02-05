@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,84 +11,123 @@ import {
   Image,
   FlatList,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAppSelector } from '@/store/hooks';
 import { selectUser } from '@/store/slices/authSlice';
-import { mockCourses, courseCategories, courseLevels, sortOptions } from '@/constants/mockData';
-import { Course, CourseCategory, CourseLevel } from '@/types/course.types';
+import { Course, Category, CoursesResponse, CategoriesResponse } from '@/types/course.types';
+import courseService from '@/services/course.service';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
+const SMALL_CARD_WIDTH = (width - 48) / 2; // 2 columns with padding
 
 export default function HomeScreen() {
   const user = useAppSelector(selectUser);
+  const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<CourseCategory | 'ALL'>('ALL');
-  const [selectedLevel, setSelectedLevel] = useState<CourseLevel | 'ALL'>('ALL');
-  const [selectedSort, setSelectedSort] = useState<string>('popular');
-  const [showFilters, setShowFilters] = useState(false);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [bestSellingCourses, setBestSellingCourses] = useState<Course[]>([]);
+  const [discountedCourses, setDiscountedCourses] = useState<Course[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+
+  // Hero banner images
+  const heroBanners = [
+    {
+      id: '1',
+      title: 'Learn Programming',
+      subtitle: 'Master coding skills with expert instructors',
+      image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800',
+      buttonText: 'Start Coding'
+    },
+    {
+      id: '2', 
+      title: 'Design Mastery',
+      subtitle: 'Create stunning visuals and user experiences',
+      image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800',
+      buttonText: 'Learn Design'
+    },
+    {
+      id: '3',
+      title: 'Business Skills',
+      subtitle: 'Develop leadership and entrepreneurial mindset',
+      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
+      buttonText: 'Grow Business'
+    }
+  ];
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // Simulate refresh
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await loadData();
     setRefreshing(false);
   };
 
-  // Filter and sort courses
-  const filteredCourses = useMemo(() => {
-    let result = [...mockCourses];
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load categories
+      const categoriesResponse = await courseService.getCategories();
+      if (categoriesResponse.success) {
+        setCategories(categoriesResponse.data);
+      }
 
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        course =>
-          course.title.toLowerCase().includes(query) ||
-          course.description.toLowerCase().includes(query) ||
-          course.instructor.toLowerCase().includes(query) ||
-          course.tags.some(tag => tag.toLowerCase().includes(query))
-      );
+      // Load all courses
+      const coursesResponse = await courseService.getCourses({
+        page: 1,
+        size: 50,
+        sort: JSON.stringify({ "createdAt": "desc" })
+      });
+      
+      if (coursesResponse.success) {
+        setCourses(coursesResponse.data);
+        setFilteredCourses(coursesResponse.data); // Initialize filtered courses
+      }
+
+      // Load best selling courses (sorted by enrollmentCount)
+      const bestSellingResponse = await courseService.getCourses({
+        page: 1,
+        size: 10,
+        sort: JSON.stringify({ "enrollmentCount": "desc" })
+      });
+      
+      if (bestSellingResponse.success) {
+        setBestSellingCourses(bestSellingResponse.data);
+      }
+      // Load discounted courses
+      const discountedResponse = await courseService.getCourses({
+        page: 1,
+        size: 20,
+      });
+      
+      if (discountedResponse.success) {
+        // Filter only courses that have discountedPrice less than price
+        const filtered = discountedResponse.data.filter(
+          course => course.discountedPrice && course.discountedPrice < course.price
+        )
+        // Sort by highest discount percentage
+        .sort((a, b) => ((b.price - (b.discountedPrice || 0)) / b.price - (a.price - (a.discountedPrice || 0)) / a.price));
+        setDiscountedCourses(filtered);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      Alert.alert('Error', 'Failed to load data. Please try again.');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Category filter
-    if (selectedCategory !== 'ALL') {
-      result = result.filter(course => course.category === selectedCategory);
-    }
-
-    // Level filter
-    if (selectedLevel !== 'ALL') {
-      result = result.filter(course => course.level === selectedLevel);
-    }
-
-    // Sort
-    switch (selectedSort) {
-      case 'popular':
-        result.sort((a, b) => b.totalStudents - a.totalStudents);
-        break;
-      case 'newest':
-        result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-      case 'rating':
-        result.sort((a, b) => b.rating - a.rating);
-        break;
-      case 'price_low':
-        result.sort((a, b) => a.price - b.price);
-        break;
-      case 'price_high':
-        result.sort((a, b) => b.price - a.price);
-        break;
-    }
-
-    return result;
-  }, [searchQuery, selectedCategory, selectedLevel, selectedSort]);
-
-  const featuredCourses = useMemo(() => {
-    return mockCourses.filter(course => course.isFeatured);
+  useEffect(() => {
+    loadData();
   }, []);
 
   const formatPrice = (price: number) => {
@@ -98,74 +137,196 @@ export default function HomeScreen() {
     }).format(price);
   };
 
-  const renderCourseCard = ({ item }: { item: Course }) => (
+  const calculateDiscountPercentage = (price: number, discountPrice: number | null) => {
+    if (!discountPrice || discountPrice >= price) return 0;
+    return Math.round(((price - discountPrice) / price) * 100);
+  };
+
+  const handleCoursePress = (course: Course) => {
+    router.push(`/course-detail?courseId=${course.id}`);
+  };
+
+  const handleCategoryPress = (categoryId: string) => {
+    if (selectedCategory === categoryId) {
+      // If same category is pressed, show all courses
+      setSelectedCategory('');
+      setFilteredCourses(courses);
+    } else {
+      // Filter courses by selected category
+      setSelectedCategory(categoryId);
+      const filtered = courses.filter(course => 
+        course.category === categories.find(cat => cat.id === categoryId)?.name
+      );
+      setFilteredCourses(filtered);
+    }
+  };
+
+  const renderHorizontalCourseCard = ({ item }: { item: Course }) => (
     <TouchableOpacity 
-      className="rounded-2xl overflow-hidden bg-black/30"
-      style={{ width: CARD_WIDTH, marginRight: 16 }}
+      className="rounded-2xl overflow-hidden bg-black/30 mr-4"
+      style={{ width: CARD_WIDTH }}
       activeOpacity={0.9}
+      onPress={() => handleCoursePress(item)}
     >
-      <Image source={{ uri: item.thumbnail }} className="w-full h-40" />
-      {item.isNew && (
-        <View className="absolute top-3 left-3 bg-emerald-500 px-2.5 py-1 rounded-lg">
-          <Text className="text-white text-xs font-bold">NEW</Text>
-        </View>
-      )}
+      <Image 
+        source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }} 
+        className="w-full h-40" 
+        resizeMode="cover"
+      />
       <BlurView intensity={80} tint="dark" className="p-4">
         <Text className="text-base font-bold text-white mb-2" numberOfLines={2}>
           {item.title}
         </Text>
+        <Text className="text-xs text-white/70 mb-2" numberOfLines={2}>
+          {item.description}
+        </Text>
         <View className="flex-row items-center mb-2">
-          {item.instructorAvatar && (
-            <Image source={{ uri: item.instructorAvatar }} className="w-6 h-6 rounded-full mr-2" />
-          )}
-          <Text className="text-xs text-white/70">{item.instructor}</Text>
-        </View>
-        <View className="flex-row mb-2">
           <View className="flex-row items-center mr-4">
             <Ionicons name="star" size={14} color="#fbbf24" />
             <Text className="text-xs text-white/70 ml-1">{item.rating}</Text>
           </View>
           <View className="flex-row items-center mr-4">
-            <Ionicons name="people" size={14} color="#8b45ff" />
-            <Text className="text-xs text-white/70 ml-1">{item.totalStudents.toLocaleString()}</Text>
-          </View>
-          <View className="flex-row items-center mr-4">
             <Ionicons name="time" size={14} color="#10b981" />
-            <Text className="text-xs text-white/70 ml-1">{item.duration}</Text>
+            <Text className="text-xs text-white/70 ml-1">{item.duration}m</Text>
+          </View>
+          <View className="flex-row items-center">
+            <Ionicons name="people" size={14} color="#8b45ff" />
+            <Text className="text-xs text-white/70 ml-1">{item.enrollmentCount}</Text>
           </View>
         </View>
         <View className="flex-row items-center">
-          <Text className="text-lg font-bold text-primary">{formatPrice(item.price)}</Text>
-          {item.originalPrice && (
-            <Text className="text-sm text-white/50 line-through ml-2">{formatPrice(item.originalPrice)}</Text>
+          {item.discountedPrice && item.discountedPrice < item.price ? (
+            <>
+              <Text className="text-lg font-bold text-primary">{formatPrice(item.discountedPrice)}</Text>
+              <Text className="text-sm text-white/50 line-through ml-2">{formatPrice(item.price)}</Text>
+              <View className="bg-red-500 px-2 py-1 rounded-md ml-2">
+                <Text className="text-white text-xs font-bold">
+                  -{calculateDiscountPercentage(item.price, item.discountedPrice)}%
+                </Text>
+              </View>
+            </>
+          ) : (
+            <Text className="text-lg font-bold text-primary">{formatPrice(item.price)}</Text>
           )}
         </View>
       </BlurView>
     </TouchableOpacity>
   );
 
-  const renderSmallCourseCard = ({ item }: { item: Course }) => (
-    <TouchableOpacity 
-      className="flex-row mx-5 mb-4 bg-white/10 rounded-2xl overflow-hidden border border-white/10"
-      activeOpacity={0.9}
-    >
-      <Image source={{ uri: item.thumbnail }} className="w-30 h-25" />
-      <View className="flex-1 p-3 justify-between">
-        <Text className="text-sm font-semibold text-white" numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text className="text-xs text-white/60">{item.instructor}</Text>
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center">
+  const renderGridCourseCard = ({ item }: { item: Course }) => {
+    const discountPercentage = calculateDiscountPercentage(item.price, item.discountedPrice);
+    
+    return (
+      <TouchableOpacity 
+        className="rounded-2xl overflow-hidden bg-black/30 mb-4"
+        style={{ width: SMALL_CARD_WIDTH }}
+        activeOpacity={0.9}
+        onPress={() => handleCoursePress(item)}
+      >
+        <Image 
+          source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }} 
+          className="w-full h-32" 
+          resizeMode="cover"
+        />
+        {discountPercentage > 0 && (
+          <View className="absolute top-2 right-2 bg-red-500 px-2 py-1 rounded-md">
+            <Text className="text-white text-xs font-bold">-{discountPercentage}%</Text>
+          </View>
+        )}
+        <BlurView intensity={80} tint="dark" className="p-3">
+          <Text className="text-sm font-bold text-white mb-1" numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text className="text-xs text-white/60 mb-2" numberOfLines={1}>
+            {item.category}
+          </Text>
+          <View className="flex-row items-center mb-2">
             <Ionicons name="star" size={12} color="#fbbf24" />
             <Text className="text-xs text-white/70 ml-1">{item.rating}</Text>
           </View>
-          <Text className="text-xs text-primary bg-primary/20 px-2 py-0.5 rounded-md overflow-hidden">{item.level}</Text>
+          <View className="flex-row items-center">
+            {item.discountedPrice && item.discountedPrice < item.price ? (
+              <View className="flex-row items-center">
+                <Text className="text-sm font-bold text-primary">{formatPrice(item.discountedPrice)}</Text>
+                <Text className="text-xs text-white/50 line-through ml-1">{formatPrice(item.price)}</Text>
+              </View>
+            ) : (
+              <Text className="text-sm font-bold text-primary">{formatPrice(item.price)}</Text>
+            )}
+          </View>
+        </BlurView>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderHeroBanner = ({ item }: { item: typeof heroBanners[0] }) => (
+    <TouchableOpacity 
+      className="rounded-3xl overflow-hidden bg-black/30 mr-4"
+      style={{ width: width - 40 }}
+      activeOpacity={0.9}
+    >
+      <ImageBackground 
+        source={{ uri: item.image }}
+        className="w-full h-48"
+        resizeMode="cover"
+      >
+        <View className="flex-1 bg-black/40 justify-end">
+          <BlurView intensity={60} tint="dark" className="p-6 border-t border-white/10">
+            <Text className="text-2xl font-bold text-white mb-2">
+              {item.title}
+            </Text>
+            <Text className="text-white/80 mb-4" numberOfLines={2}>
+              {item.subtitle}
+            </Text>
+            <TouchableOpacity className="bg-primary py-3 px-6 rounded-2xl self-start">
+              <Text className="text-white font-semibold">{item.buttonText}</Text>
+            </TouchableOpacity>
+          </BlurView>
         </View>
-        <Text className="text-sm font-bold text-primary">{formatPrice(item.price)}</Text>
-      </View>
+      </ImageBackground>
     </TouchableOpacity>
   );
+
+  const renderCategoryCard = ({ item }: { item: Category }) => (
+    <TouchableOpacity
+      className={`ml-4 rounded-2xl overflow-hidden ${
+        selectedCategory === item.id ? 'border-2 border-primary' : ''
+      }`}
+      onPress={() => handleCategoryPress(item.id)}
+    >
+      <BlurView
+        intensity={selectedCategory === item.id ? 60 : 30}
+        tint="dark"
+        className="py-4 px-5 items-center"
+        style={{ minWidth: 90 }}
+      >
+        <Ionicons
+          name="folder-outline"
+          size={24}
+          color={selectedCategory === item.id ? '#8b45ff' : '#fff'}
+        />
+        <Text
+          className={`text-xs mt-2 text-center ${
+            selectedCategory === item.id 
+              ? 'text-primary font-semibold' 
+              : 'text-white'
+          }`}
+          numberOfLines={2}
+        >
+          {item.name}
+        </Text>
+      </BlurView>
+    </TouchableOpacity>
+  );
+
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center bg-black">
+        <ActivityIndicator size="large" color="#8b45ff" />
+        <Text className="text-white mt-4 text-base">Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
@@ -202,8 +363,8 @@ export default function HomeScreen() {
           </View>
 
           {/* Search Bar */}
-          <View className="flex-row px-5 mb-4 gap-3">
-            <BlurView intensity={40} tint="dark" className="flex-1 flex-row items-center px-4 h-12 rounded-full overflow-hidden border border-white/10">
+          <View className="px-5 mb-6">
+            <BlurView intensity={40} tint="dark" className="flex-row items-center px-4 h-12 rounded-full overflow-hidden border border-white/10">
               <Ionicons name="search" size={20} color="rgba(255,255,255,0.6)" />
               <TextInput
                 className="flex-1 ml-3 text-base text-white"
@@ -218,124 +379,78 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               )}
             </BlurView>
-            <TouchableOpacity
-              className={`w-12 h-12 rounded-full overflow-hidden ${showFilters ? 'border-2 border-primary' : ''}`}
-              onPress={() => setShowFilters(!showFilters)}
-            >
-              <BlurView intensity={40} tint="dark" className="flex-1 justify-center items-center">
-                <Ionicons name="options" size={20} color={showFilters ? '#8b45ff' : '#fff'} />
-              </BlurView>
-            </TouchableOpacity>
           </View>
 
-          {/* Filters */}
-          {showFilters && (
-            <BlurView intensity={40} tint="dark" className="mx-5 mb-4 rounded-2xl p-4 overflow-hidden border border-white/10">
-              {/* Level Filter */}
-              <View className="mb-3">
-                <Text className="text-sm font-semibold text-white/70 mb-2">Level</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {courseLevels.map(level => (
-                    <TouchableOpacity
-                      key={level.key}
-                      className={`px-4 py-2 rounded-2xl mr-2 border ${
-                        selectedLevel === level.key 
-                          ? 'bg-primary border-primary' 
-                          : 'bg-white/10 border-white/10'
-                      }`}
-                      onPress={() => setSelectedLevel(level.key)}
-                    >
-                      <Text
-                        className={`text-sm ${
-                          selectedLevel === level.key ? 'text-white font-semibold' : 'text-white/70'
-                        }`}
-                      >
-                        {level.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
+          {/* Hero Section - Banner Gallery */}
+          <View className="mb-6">
+            <FlatList
+              horizontal
+              data={heroBanners}
+              renderItem={renderHeroBanner}
+              keyExtractor={item => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20 }}
+              pagingEnabled
+              snapToInterval={width - 40 + 16} // card width + margin
+              decelerationRate="fast"
+            />
+          </View>
 
-              {/* Sort Filter */}
-              <View className="mb-3">
-                <Text className="text-sm font-semibold text-white/70 mb-2">Sort By</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {sortOptions.map(option => (
-                    <TouchableOpacity
-                      key={option.key}
-                      className={`px-4 py-2 rounded-2xl mr-2 border ${
-                        selectedSort === option.key
-                          ? 'bg-primary border-primary'
-                          : 'bg-white/10 border-white/10'
-                      }`}
-                      onPress={() => setSelectedSort(option.key)}
-                    >
-                      <Text
-                        className={`text-sm ${
-                          selectedSort === option.key ? 'text-white font-semibold' : 'text-white/70'
-                        }`}
-                      >
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            </BlurView>
-          )}
-
-          {/* Categories */}
+          {/* Categories Carousel */}
           <View className="mb-6">
             <Text className="text-xl font-bold text-white px-5 mb-4">Categories</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {courseCategories.map(category => (
-                <TouchableOpacity
-                  key={category.key}
-                  className={`ml-4 rounded-2xl overflow-hidden ${
-                    selectedCategory === category.key ? 'border-2 border-primary' : ''
-                  }`}
-                  onPress={() => setSelectedCategory(category.key as CourseCategory | 'ALL')}
-                >
-                  <BlurView
-                    intensity={selectedCategory === category.key ? 60 : 30}
-                    tint="dark"
-                    className="py-4 px-5 items-center"
-                    style={{ minWidth: 90 }}
-                  >
-                    <Ionicons
-                      name={category.icon as any}
-                      size={24}
-                      color={selectedCategory === category.key ? '#8b45ff' : '#fff'}
-                    />
-                    <Text
-                      className={`text-xs mt-2 ${
-                        selectedCategory === category.key 
-                          ? 'text-primary font-semibold' 
-                          : 'text-white'
-                      }`}
-                    >
-                      {category.label}
-                    </Text>
-                  </BlurView>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <FlatList
+              horizontal
+              data={categories}
+              renderItem={renderCategoryCard}
+              keyExtractor={item => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingRight: 20 }}
+            />
           </View>
 
-          {/* Featured Courses */}
-          {selectedCategory === 'ALL' && !searchQuery && (
+          {/* Filtered Courses by Category */}
+          {selectedCategory && (
             <View className="mb-6">
               <View className="flex-row justify-between items-center px-5 mb-4">
-                <Text className="text-xl font-bold text-white">Featured Courses</Text>
+                <Text className="text-xl font-bold text-white">
+                  {categories.find(cat => cat.id === selectedCategory)?.name} Courses
+                </Text>
+                <Text className="text-sm text-white/50">{filteredCourses.length} courses</Text>
+              </View>
+              {filteredCourses.length > 0 ? (
+                <FlatList
+                  data={filteredCourses}
+                  renderItem={renderGridCourseCard}
+                  keyExtractor={item => item.id}
+                  numColumns={2}
+                  columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
+                  scrollEnabled={false}
+                  ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
+                />
+              ) : (
+                <View className="items-center py-10">
+                  <Ionicons name="folder-open-outline" size={48} color="rgba(255,255,255,0.3)" />
+                  <Text className="text-lg font-semibold text-white mt-4">No courses found</Text>
+                  <Text className="text-sm text-white/50 mt-2">This category has no courses yet</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Best Selling Courses */}
+          {bestSellingCourses.length > 0 && !selectedCategory && (
+            <View className="mb-6">
+              <View className="flex-row justify-between items-center px-5 mb-4">
+                <Text className="text-xl font-bold text-white">Best Selling</Text>
                 <TouchableOpacity>
                   <Text className="text-sm text-primary font-semibold">See All</Text>
                 </TouchableOpacity>
               </View>
               <FlatList
                 horizontal
-                data={featuredCourses}
-                renderItem={renderCourseCard}
+                data={bestSellingCourses}
+                renderItem={renderHorizontalCourseCard}
                 keyExtractor={item => item.id}
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={{ paddingLeft: 20 }}
@@ -343,30 +458,24 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* All/Filtered Courses */}
-          <View className="mb-6">
-            <View className="flex-row justify-between items-center px-5 mb-4">
-              <Text className="text-xl font-bold text-white">
-                {searchQuery
-                  ? `Results (${filteredCourses.length})`
-                  : selectedCategory === 'ALL'
-                  ? 'All Courses'
-                  : courseCategories.find(c => c.key === selectedCategory)?.label}
-              </Text>
-              <Text className="text-sm text-white/50">{filteredCourses.length} courses</Text>
-            </View>
-            {filteredCourses.length > 0 ? (
-              filteredCourses.map(course => (
-                <View key={course.id}>{renderSmallCourseCard({ item: course })}</View>
-              ))
-            ) : (
-              <View className="items-center py-10">
-                <Ionicons name="search" size={48} color="rgba(255,255,255,0.3)" />
-                <Text className="text-lg font-semibold text-white mt-4">No courses found</Text>
-                <Text className="text-sm text-white/50 mt-2">Try adjusting your filters</Text>
+          {/* Discounted Courses Grid */}
+          {discountedCourses.length > 0 && !selectedCategory && (
+            <View className="mb-6">
+              <View className="flex-row justify-between items-center px-5 mb-4">
+                <Text className="text-xl font-bold text-white">Special Offers</Text>
+                <Text className="text-sm text-white/50">{discountedCourses.length} courses</Text>
               </View>
-            )}
-          </View>
+              <FlatList
+                data={discountedCourses}
+                renderItem={renderGridCourseCard}
+                keyExtractor={item => item.id}
+                numColumns={2}
+                columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
+                scrollEnabled={false}
+                ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
+              />
+            </View>
+          )}
 
           {/* Bottom Padding for Tab Bar */}
           <View style={{ height: 100 }} />

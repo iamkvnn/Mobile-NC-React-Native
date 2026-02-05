@@ -4,8 +4,8 @@
  */
 
 import { ApiResponse, CourseListResponse, SingleCourseResponse } from '@/types/api.types';
-import { Course, CourseSearchParams, CoursesResponse, CourseDetailResponse } from '@/types/course.types';
-import { courseApiService } from './api.service.factory';
+import { Course, CourseSearchParams, CoursesResponse, CourseDetailResponse, CategoriesResponse } from '@/types/course.types';
+import { apiService } from './api.service';
 
 class CourseService {
   private readonly baseEndpoint = '/courses';
@@ -20,14 +20,11 @@ class CourseService {
       if (params.query) queryParams.append('query', params.query);
       if (params.page !== undefined) queryParams.append('page', params.page.toString());
       if (params.size !== undefined) queryParams.append('size', params.size.toString());
-      if (params.category) queryParams.append('category', params.category);
-      if (params.minPrice !== undefined) queryParams.append('minPrice', params.minPrice.toString());
-      if (params.maxPrice !== undefined) queryParams.append('maxPrice', params.maxPrice.toString());
-      if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+      if (params.sort) queryParams.append('sort', params.sort);
 
       const url = `${this.baseEndpoint}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       
-      const response = await courseApiService.get<CoursesResponse>(url);
+      const response = await apiService.get<CoursesResponse>(url);
       return response;
     } catch (error) {
       console.error('Failed to fetch courses:', error);
@@ -40,10 +37,23 @@ class CourseService {
    */
   async getCourseById(courseId: string): Promise<CourseDetailResponse> {
     try {
-      const response = await courseApiService.get<CourseDetailResponse>(`${this.baseEndpoint}/${courseId}`);
+      const response = await apiService.get<CourseDetailResponse>(`${this.baseEndpoint}/${courseId}`);
       return response;
     } catch (error) {
       console.error(`Failed to fetch course with ID ${courseId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all categories
+   */
+  async getCategories(): Promise<CategoriesResponse> {
+    try {
+      const response = await apiService.get<CategoriesResponse>('/categories');
+      return response;
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
       throw error;
     }
   }
