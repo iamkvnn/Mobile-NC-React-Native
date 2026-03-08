@@ -3,10 +3,12 @@ import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import authReducer from './slices/authSlice';
 import courseReducer from './slices/courseSlice';
+import cartReducer from './slices/cartSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
   courses: courseReducer,
+  cart: cartReducer,
 });
 
 const persistConfig = {

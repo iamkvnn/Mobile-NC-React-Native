@@ -22,6 +22,7 @@ import { useAppSelector } from '@/store/hooks';
 import { selectUser } from '@/store/slices/authSlice';
 import { Course, Category, CoursesResponse, CategoriesResponse } from '@/types/course.types';
 import courseService from '@/services/course.service';
+import { selectCartCount } from '@/store/slices/cartSlice';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
@@ -30,6 +31,7 @@ const SMALL_CARD_WIDTH = (width - 48) / 2; // 2 columns with padding
 export default function HomeScreen() {
   const user = useAppSelector(selectUser);
   const router = useRouter();
+  const cartCount = useAppSelector(selectCartCount);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [courses, setCourses] = useState<Course[]>([]);
@@ -39,6 +41,9 @@ export default function HomeScreen() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [coursesPage, setCoursesPage] = useState(1);
+  const [coursesHasMore, setCoursesHasMore] = useState(true);
+  const [coursesLoadingMore, setCoursesLoadingMore] = useState(false);
 
   // Hero banner images
   const heroBanners = [
@@ -81,16 +86,20 @@ export default function HomeScreen() {
         setCategories(categoriesResponse.data);
       }
 
-      // Load all courses
+      // Load all courses (page 1)
       const coursesResponse = await courseService.getCourses({
         page: 1,
-        size: 50,
+        size: 10,
         sort: JSON.stringify({ "createdAt": "desc" })
       });
       
       if (coursesResponse.success) {
         setCourses(coursesResponse.data);
-        setFilteredCourses(coursesResponse.data); // Initialize filtered courses
+        setFilteredCourses(coursesResponse.data);
+        setCoursesPage(1);
+        setCoursesHasMore(
+          (coursesResponse.meta?.page ?? 1) < (coursesResponse.meta?.totalPages ?? 1)
+        );
       }
 
       // Load best selling courses (sorted by enrollmentCount)
@@ -158,6 +167,36 @@ export default function HomeScreen() {
         course.category === categories.find(cat => cat.id === categoryId)?.name
       );
       setFilteredCourses(filtered);
+    }
+  };
+
+  const loadMoreCourses = async () => {
+    if (coursesLoadingMore || !coursesHasMore) return;
+    setCoursesLoadingMore(true);
+    try {
+      const nextPage = coursesPage + 1;
+      const res = await courseService.getCourses({
+        page: nextPage,
+        size: 10,
+        sort: JSON.stringify({ 'createdAt': 'desc' }),
+      });
+      if (res.success) {
+        const newCourses = res.data;
+        setCourses(prev => [...prev, ...newCourses]);
+        setCoursesPage(nextPage);
+        setCoursesHasMore(nextPage < (res.meta?.totalPages ?? nextPage));
+        if (selectedCategory) {
+          const categoryName = categories.find(cat => cat.id === selectedCategory)?.name;
+          setFilteredCourses(prev => [
+            ...prev,
+            ...newCourses.filter(c => c.category === categoryName),
+          ]);
+        }
+      }
+    } catch (e) {
+      console.error('loadMoreCourses error', e);
+    } finally {
+      setCoursesLoadingMore(false);
     }
   };
 
@@ -347,6 +386,18 @@ export default function HomeScreen() {
               colors={['#8b45ff']}
             />
           }
+          onScroll={({ nativeEvent }) => {
+            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+            if (
+              !selectedCategory &&
+              coursesHasMore &&
+              !coursesLoadingMore &&
+              layoutMeasurement.height + contentOffset.y >= contentSize.height - 300
+            ) {
+              loadMoreCourses();
+            }
+          }}
+          scrollEventThrottle={400}
           showsVerticalScrollIndicator={false}
         >
           {/* Header */}
@@ -355,9 +406,21 @@ export default function HomeScreen() {
               <Text className="text-sm text-white/70">Welcome back!</Text>
               <Text className="text-2xl font-bold text-white">{user?.name || 'User'}</Text>
             </View>
-            <TouchableOpacity className="w-11 h-11 rounded-full overflow-hidden">
+            <TouchableOpacity
+              className="w-11 h-11 rounded-full overflow-hidden"
+              onPress={() => router.push('/cart')}
+            >
               <BlurView intensity={20} tint="dark" className="flex-1 justify-center items-center">
-                <Ionicons name="notifications-outline" size={24} color="#fff" />
+                <Ionicons name="cart-outline" size={24} color="#fff" />
+                {cartCount > 0 && (
+                  <View
+                    className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary justify-center items-center"
+                  >
+                    <Text className="text-white text-[9px] font-bold">
+                      {cartCount > 9 ? '9+' : cartCount}
+                    </Text>
+                  </View>
+                )}
               </BlurView>
             </TouchableOpacity>
           </View>
@@ -474,6 +537,35 @@ export default function HomeScreen() {
                 scrollEnabled={false}
                 ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
               />
+            </View>
+          )}
+
+          {/* All Courses (paginated) */}
+          {!selectedCategory && courses.length > 0 && (
+            <View className="mb-2">
+              <View className="flex-row justify-between items-center px-5 mb-4">
+                <Text className="text-xl font-bold text-white">Tất cả khóa học</Text>
+                <Text className="text-sm text-white/50">{courses.length} khóa học</Text>
+              </View>
+              <FlatList
+                data={courses}
+                renderItem={renderGridCourseCard}
+                keyExtractor={item => item.id}
+                numColumns={2}
+                columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
+                scrollEnabled={false}
+              />
+              {coursesLoadingMore && (
+                <View className="py-4 items-center">
+                  <ActivityIndicator color="#8b45ff" size="small" />
+                  <Text className="text-white/40 text-xs mt-2">Đang tải thêm...</Text>
+                </View>
+              )}
+              {!coursesHasMore && courses.length > 0 && (
+                <Text className="text-white/30 text-xs text-center py-3">
+                  Đã hiển thị tất cả {courses.length} khóa học
+                </Text>
+              )}
             </View>
           )}
 

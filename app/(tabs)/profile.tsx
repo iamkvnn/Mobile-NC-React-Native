@@ -20,6 +20,7 @@ import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectUser, selectIsLoading, logoutUser, updateUserProfile, updateUserProfileWithAvatar } from '@/store/slices/authSlice';
 import { authService } from '@/services/auth.service';
 import { Gender } from '@/types/api.types';
+import { router } from 'expo-router';
 
 type ModalType = 'editProfile' | 'changePassword' | 'changeEmail' | null;
 
@@ -729,6 +730,25 @@ export default function ProfileScreen() {
         {/* Actions */}
         <View className="mb-6">
           <Text className="text-lg font-semibold text-white mb-4">Account Settings</Text>
+
+              {/* My Orders */}
+              <TouchableOpacity
+                className="mb-3 rounded-2xl overflow-hidden"
+                onPress={() => router.push('/orders')}
+              >
+                <BlurView intensity={20} tint="dark" className="flex-row justify-between items-center p-4 border border-white/10 rounded-2xl">
+                  <View className="flex-row items-center gap-4">
+                    <View className="w-11 h-11 rounded-xl justify-center items-center bg-orange-500/30">
+                      <Ionicons name="receipt-outline" size={20} color="#f97316" />
+                    </View>
+                    <View>
+                      <Text className="text-base font-semibold text-white">Đơn hàng của tôi</Text>
+                      <Text className="text-xs text-white/50">Xem lịch sử mua khóa học</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+                </BlurView>
+              </TouchableOpacity>
 
               <TouchableOpacity className="mb-3 rounded-2xl overflow-hidden" onPress={openEditProfile}>
                 <BlurView intensity={20} tint="dark" className="flex-row justify-between items-center p-4 border border-white/10 rounded-2xl">

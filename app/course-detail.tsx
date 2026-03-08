@@ -8,13 +8,13 @@ import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   Image,
   TouchableOpacity,
   ImageBackground,
   Dimensions,
   Platform,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { BlurView } from 'expo-blur';
@@ -22,26 +22,42 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Course } from '@/types/course.types';
 import courseService from '@/services/course.service';
+import enrollmentService from '@/services/enrollment.service';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { addToCart, selectCartItems, selectCartCount, fetchCart } from '@/store/slices/cartSlice';
 
 const { width } = Dimensions.get('window');
 
 const CourseDetailScreen: React.FC = () => {
   const { courseId } = useLocalSearchParams<{ courseId: string }>();
+  const dispatch = useAppDispatch();
+  const cartItems = useAppSelector(selectCartItems);
+  const cartCount = useAppSelector(selectCartCount);
   const [course, setCourse] = useState<Course | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEnrolled, setIsEnrolled] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
+
+  const isInCart = cartItems.some((item) => item.course.id === courseId);
 
   useEffect(() => {
     const loadCourseDetail = async () => {
       if (!courseId) return;
-      
       try {
         setLoading(true);
-        const response = await courseService.getCourseById(courseId);
-        if (response.success) {
-          setCourse(response.data);
+        const [courseRes, enrollmentRes] = await Promise.all([
+          courseService.getCourseById(courseId),
+          enrollmentService.checkEnrollment([courseId]),
+        ]);
+        if (courseRes.success) {
+          setCourse(courseRes.data);
         } else {
           setError('Failed to load course details');
+        }
+        if (enrollmentRes.success) {
+          const result = enrollmentRes.data.find((e) => e.courseId === courseId);
+          setIsEnrolled(result?.isEnrolled ?? false);
         }
       } catch (err) {
         console.error('Error loading course:', err);
@@ -51,8 +67,26 @@ const CourseDetailScreen: React.FC = () => {
       }
     };
 
+    dispatch(fetchCart());
     loadCourseDetail();
   }, [courseId]);
+
+  const handleAddToCart = async () => {
+    if (!courseId) return;
+    if (isInCart) {
+      router.push('/cart');
+      return;
+    }
+    setAddingToCart(true);
+    try {
+      await dispatch(addToCart(courseId)).unwrap();
+      Alert.alert('Thành công', 'Đã thêm khóa học vào giỏ hàng!');
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể thêm vào giỏ hàng.');
+    } finally {
+      setAddingToCart(false);
+    }
+  };
 
   const formatDuration = (minutes: number): string => {
     const hours = Math.floor(minutes / 60);
@@ -136,11 +170,19 @@ const CourseDetailScreen: React.FC = () => {
               </BlurView>
             </TouchableOpacity>
             
-            <Text className="text-xl font-bold text-white">Course Details</Text>
+            <Text className="text-xl font-bold text-white">Chi tiết khóa học</Text>
             
-            <TouchableOpacity className="w-11 h-11 rounded-full overflow-hidden">
+            <TouchableOpacity
+              className="w-11 h-11 rounded-full overflow-hidden"
+              onPress={() => router.push('/cart')}
+            >
               <BlurView intensity={40} tint="dark" className="flex-1 justify-center items-center">
-                <Ionicons name="share-outline" size={20} color="#fff" />
+                <Ionicons name="cart-outline" size={22} color="#fff" />
+                {cartCount > 0 && (
+                  <View className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary justify-center items-center">
+                    <Text className="text-white text-[9px] font-bold">{cartCount > 9 ? '9+' : cartCount}</Text>
+                  </View>
+                )}
               </BlurView>
             </TouchableOpacity>
           </View>
@@ -235,10 +277,44 @@ const CourseDetailScreen: React.FC = () => {
                     </Text>
                   )}
                 </View>
-                
-                <TouchableOpacity className="bg-primary py-4 px-8 rounded-2xl">
-                  <Text className="text-white font-bold text-lg">Enroll Now</Text>
-                </TouchableOpacity>
+
+                {isEnrolled ? (
+                  <TouchableOpacity
+                    className="bg-green-600 py-4 px-8 rounded-2xl flex-row items-center"
+                    onPress={() => Alert.alert('Vào học', 'Tính năng xem bài học đang được phát triển.')}
+                  >
+                    <Ionicons name="play-circle-outline" size={20} color="#fff" style={{ marginRight: 6 }} />
+                    <Text className="text-white font-bold text-base">Vào học</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    className={`py-4 px-6 rounded-2xl flex-row items-center ${
+                      isInCart ? 'bg-white/20 border border-primary' : 'bg-primary'
+                    }`}
+                    onPress={handleAddToCart}
+                    disabled={addingToCart}
+                  >
+                    {addingToCart ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons
+                          name={isInCart ? 'cart' : 'cart-outline'}
+                          size={18}
+                          color={isInCart ? '#8b45ff' : '#fff'}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text
+                          className={`font-bold text-base ${
+                            isInCart ? 'text-primary' : 'text-white'
+                          }`}
+                        >
+                          {isInCart ? 'Xem giỏ hàng' : 'Thêm vào giỏ'}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             </BlurView>
           </View>

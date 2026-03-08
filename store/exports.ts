@@ -1,5 +1,15 @@
 // Store exports
 export { store, persistor } from './index';
+export {
+  fetchCart,
+  addToCart,
+  removeFromCart,
+  clearCart,
+  clearCartLocal,
+  selectCartItems,
+  selectCartCount,
+  selectCartLoading,
+} from './slices/cartSlice';
 export type { RootState, AppDispatch } from './index';
 export { useAppDispatch, useAppSelector } from './hooks';
 

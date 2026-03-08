@@ -27,6 +27,11 @@ export default function RootLayout() {
             <Stack.Screen name="forgot-password" />
             <Stack.Screen name="reset-password" />
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="cart" />
+            <Stack.Screen name="checkout" />
+            <Stack.Screen name="payment-success" />
+            <Stack.Screen name="orders" />
+            <Stack.Screen name="order-detail" />
           </Stack>
         </AuthNavigation>
       </PersistGate>
