@@ -35,11 +35,11 @@ export const fetchCourseById = createAsyncThunk(
 export const searchCourses = createAsyncThunk(
   'courses/searchCourses',
   async (
-    { query, page = 1, size = 10 }: { query: string; page?: number; size?: number },
+    { query, categoryId, page = 1, size = 10 }: { query: string; categoryId?: string; page?: number; size?: number },
     { rejectWithValue }
   ) => {
     try {
-      const response = await courseService.searchCourses(query, page, size);
+      const response = await courseService.getCourses({ query, categoryId, page, size });
       return response;
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to search courses');
@@ -119,7 +119,7 @@ const courseSlice = createSlice({
         const { data, meta } = action.payload;
         
         // Handle pagination - append for lazy loading or replace for new search
-        if (meta.page === 1 || meta.page === 0 || state.courses.length === 0) {
+        if (meta.page === 1 || state.courses.length === 0) {
           state.courses = data;
         } else {
           state.courses = [...state.courses, ...data];
@@ -130,7 +130,7 @@ const courseSlice = createSlice({
           totalPages: meta.totalPages,
           totalElements: meta.totalElements,
           pageSize: meta.limit,
-          hasNextPage: meta.page < meta.totalPages - 1,
+          hasNextPage: meta.page < meta.totalPages,
         };
       })
       .addCase(fetchCourses.rejected, (state, action) => {
@@ -153,7 +153,7 @@ const courseSlice = createSlice({
           totalPages: meta.totalPages,
           totalElements: meta.totalElements,
           pageSize: meta.limit,
-          hasNextPage: meta.page < meta.totalPages - 1,
+          hasNextPage: meta.page < meta.totalPages,
         };
       })
       .addCase(searchCourses.rejected, (state, action) => {

@@ -18,6 +18,7 @@ class CourseService {
       const queryParams = new URLSearchParams();
       
       if (params.query) queryParams.append('query', params.query);
+      if (params.categoryId) queryParams.append('categoryId', params.categoryId);
       if (params.page !== undefined) queryParams.append('page', params.page.toString());
       if (params.size !== undefined) queryParams.append('size', params.size.toString());
       if (params.sort) queryParams.append('sort', params.sort);
@@ -56,17 +57,6 @@ class CourseService {
       console.error('Failed to fetch categories:', error);
       throw error;
     }
-  }
-
-  /**
-   * Search courses
-   */
-  async searchCourses(
-    query: string, 
-    page: number = 1, 
-    size: number = 10
-  ): Promise<CoursesResponse> {
-    return this.getCourses({ query, page, size });
   }
 }
 

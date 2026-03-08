@@ -10,7 +10,7 @@
 export type Gender = 'MALE' | 'FEMALE';
 
 export interface User {
-  id: string;
+  userId: string;
   name: string;
   email: string;
   role: string;
@@ -64,15 +64,6 @@ export interface ChangeEmailRequest {
 export interface UpdateUserRequest {
   name?: string;
   gender?: Gender;
-}
-
-export interface UpdateUserWithAvatarRequest extends UpdateUserRequest {
-  avatar?: File | string; // File for upload, string for URL
-}
-
-export interface UpdateUserFormData {
-  user: UpdateUserRequest;
-  avatar?: File;
 }
 
 export interface ResendOtpRequest {

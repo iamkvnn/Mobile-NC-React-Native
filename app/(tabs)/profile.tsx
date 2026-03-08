@@ -17,10 +17,11 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { selectUser, selectIsLoading, logoutUser, updateUserProfile, updateUserProfileWithAvatar } from '@/store/slices/authSlice';
+import { selectUser, selectIsLoading, logoutUser, updateUserProfile } from '@/store/slices/authSlice';
 import { authService } from '@/services/auth.service';
 import { Gender } from '@/types/api.types';
 import { router } from 'expo-router';
+import { getImageUrl } from '@/utils/imageUtil';
 
 type ModalType = 'editProfile' | 'changePassword' | 'changeEmail' | null;
 
@@ -162,7 +163,7 @@ export default function ProfileScreen() {
   };
 
   const handleUpdateProfile = async () => {
-    if (!user?.id) return;
+    if (!user?.userId) return;
     
     if (!editName.trim()) {
       Alert.alert('Error', 'Name cannot be empty');
@@ -171,22 +172,12 @@ export default function ProfileScreen() {
 
     setLoading(true);
     try {
-      // If avatar was selected, use the avatar upload function
-      if (selectedAvatar && avatarFile) {
-        await dispatch(updateUserProfileWithAvatar({
-          id: user.id,
-          name: editName.trim(),
-          gender: editGender,
-          avatar: avatarFile,
-        })).unwrap();
-      } else {
-        // Use regular update without avatar
-        await dispatch(updateUserProfile({
-          id: user.id,
-          name: editName.trim(),
-          gender: editGender,
-        })).unwrap();
-      }
+      await dispatch(updateUserProfile({
+        id: user.userId,
+        name: editName.trim(),
+        gender: editGender,
+        avatar: avatarFile,
+      })).unwrap();
       
       Alert.alert('Success', 'Profile updated successfully');
       setModalType(null);
@@ -341,7 +332,7 @@ export default function ProfileScreen() {
             >
               {user?.avatarUrl || selectedAvatar ? (
                 <Image 
-                  source={{ uri: selectedAvatar || user?.avatarUrl || '' }} 
+                  source={{ uri: selectedAvatar || getImageUrl(user?.avatarUrl) || '' }} 
                   className="w-full h-full rounded-full"
                   style={{ width: '100%', height: '100%' }}
                   resizeMode="cover"
@@ -676,7 +667,7 @@ export default function ProfileScreen() {
               >
                 {user?.avatarUrl || selectedAvatar ? (
                   <Image 
-                    source={{ uri: selectedAvatar || user?.avatarUrl || '' }} 
+                    source={{ uri: selectedAvatar || getImageUrl(user?.avatarUrl) || '' }} 
                     className="w-full h-full rounded-full"
                     style={{ width: '100%', height: '100%' }}
                     resizeMode="cover"
@@ -712,16 +703,6 @@ export default function ProfileScreen() {
                 icon="male-female-outline"
                 label="Gender"
                 value={user?.gender || 'N/A'}
-              />
-              <InfoRow
-                icon="shield-checkmark-outline"
-                label="Role"
-                value={user?.role || 'N/A'}
-              />
-              <InfoRow
-                icon="calendar-outline"
-                label="Member Since"
-                value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
               />
             </View>
           </View>

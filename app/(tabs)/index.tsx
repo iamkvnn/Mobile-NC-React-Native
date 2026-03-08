@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,113 +20,173 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAppSelector } from '@/store/hooks';
 import { selectUser } from '@/store/slices/authSlice';
-import { Course, Category, CoursesResponse, CategoriesResponse } from '@/types/course.types';
+import { Course, Category } from '@/types/course.types';
 import courseService from '@/services/course.service';
 import { selectCartCount } from '@/store/slices/cartSlice';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
-const SMALL_CARD_WIDTH = (width - 48) / 2; // 2 columns with padding
+const SMALL_CARD_WIDTH = (width - 48) / 2;
 
 export default function HomeScreen() {
   const user = useAppSelector(selectUser);
   const router = useRouter();
   const cartCount = useAppSelector(selectCartCount);
+
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
-  const [bestSellingCourses, setBestSellingCourses] = useState<Course[]>([]);
-  const [discountedCourses, setDiscountedCourses] = useState<Course[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+
+  // All Courses (paginated)
+  const [courses, setCourses] = useState<Course[]>([]);
   const [coursesPage, setCoursesPage] = useState(1);
   const [coursesHasMore, setCoursesHasMore] = useState(true);
   const [coursesLoadingMore, setCoursesLoadingMore] = useState(false);
 
-  // Hero banner images
+  // Category-filtered Courses (paginated)
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [filteredPage, setFilteredPage] = useState(1);
+  const [filteredHasMore, setFilteredHasMore] = useState(true);
+  const [filteredLoadingMore, setFilteredLoadingMore] = useState(false);
+
+  // Featured sections
+  const [bestSellingCourses, setBestSellingCourses] = useState<Course[]>([]);
+  const [discountedCourses, setDiscountedCourses] = useState<Course[]>([]);
+
+  const [loading, setLoading] = useState(true);
+
   const heroBanners = [
     {
       id: '1',
       title: 'Learn Programming',
       subtitle: 'Master coding skills with expert instructors',
       image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800',
-      buttonText: 'Start Coding'
+      buttonText: 'Start Coding',
     },
     {
-      id: '2', 
+      id: '2',
       title: 'Design Mastery',
       subtitle: 'Create stunning visuals and user experiences',
       image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800',
-      buttonText: 'Learn Design'
+      buttonText: 'Learn Design',
     },
     {
       id: '3',
       title: 'Business Skills',
       subtitle: 'Develop leadership and entrepreneurial mindset',
       image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800',
-      buttonText: 'Grow Business'
-    }
+      buttonText: 'Grow Business',
+    },
   ];
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
+  const loadCategories = async () => {
+    const res = await courseService.getCategories();
+    if (res.success) setCategories(res.data);
   };
+
+  const loadAllCourses = async () => {
+    const res = await courseService.getCourses({
+      page: 1,
+      size: 10,
+      sort: JSON.stringify({ createdAt: 'desc' }),
+    });
+    if (res.success) {
+      setCourses(res.data);
+      setCoursesPage(1);
+      setCoursesHasMore((res.meta?.page ?? 1) < (res.meta?.totalPages ?? 1));
+    }
+  };
+
+  const loadMoreCourses = async () => {
+    if (coursesLoadingMore || !coursesHasMore) return;
+    setCoursesLoadingMore(true);
+    try {
+      const nextPage = coursesPage + 1;
+      const res = await courseService.getCourses({
+        page: nextPage,
+        size: 10,
+        sort: JSON.stringify({ createdAt: 'desc' }),
+      });
+      if (res.success) {
+        setCourses(prev => [...prev, ...res.data]);
+        setCoursesPage(nextPage);
+        setCoursesHasMore(nextPage < (res.meta?.totalPages ?? nextPage));
+      }
+    } catch (e) {
+      console.error('loadMoreCourses error', e);
+    } finally {
+      setCoursesLoadingMore(false);
+    }
+  };
+
+  const loadCoursesByCategory = async (categoryId: string) => {
+    const res = await courseService.getCourses({
+      page: 1,
+      size: 10,
+      categoryId,
+      sort: JSON.stringify({ createdAt: 'desc' }),
+    });
+    if (res.success) {
+      setFilteredCourses(res.data);
+      setFilteredPage(1);
+      setFilteredHasMore((res.meta?.page ?? 1) < (res.meta?.totalPages ?? 1));
+    }
+  };
+
+  /** Append next page to the category-filtered list */
+  const loadMoreFilteredCourses = async () => {
+    if (filteredLoadingMore || !filteredHasMore || !selectedCategory) return;
+    setFilteredLoadingMore(true);
+    try {
+      const nextPage = filteredPage + 1;
+      const res = await courseService.getCourses({
+        page: nextPage,
+        size: 10,
+        categoryId: selectedCategory,
+        sort: JSON.stringify({ createdAt: 'desc' }),
+      });
+      if (res.success) {
+        setFilteredCourses(prev => [...prev, ...res.data]);
+        setFilteredPage(nextPage);
+        setFilteredHasMore(nextPage < (res.meta?.totalPages ?? nextPage));
+      }
+    } catch (e) {
+      console.error('loadMoreFilteredCourses error', e);
+    } finally {
+      setFilteredLoadingMore(false);
+    }
+  };
+
+  const loadBestSelling = async () => {
+    const res = await courseService.getCourses({
+      page: 1,
+      size: 10,
+      sort: JSON.stringify({ enrollmentCount: 'desc' }),
+    });
+    if (res.success) setBestSellingCourses(res.data);
+  };
+
+  const loadDiscountedCourses = async () => {
+    const res = await courseService.getCourses({
+      page: 1,
+      size: 20,
+      sort: JSON.stringify({ discountRate: 'desc' }),
+    });
+    if (res.success) setDiscountedCourses(res.data);
+  };
+
+  // ─── Initial Load & Refresh ──────────────────────────────────────────────────
 
   const loadData = async () => {
     try {
       setLoading(true);
-      
-      // Load categories
-      const categoriesResponse = await courseService.getCategories();
-      if (categoriesResponse.success) {
-        setCategories(categoriesResponse.data);
-      }
-
-      // Load all courses (page 1)
-      const coursesResponse = await courseService.getCourses({
-        page: 1,
-        size: 10,
-        sort: JSON.stringify({ "createdAt": "desc" })
-      });
-      
-      if (coursesResponse.success) {
-        setCourses(coursesResponse.data);
-        setFilteredCourses(coursesResponse.data);
-        setCoursesPage(1);
-        setCoursesHasMore(
-          (coursesResponse.meta?.page ?? 1) < (coursesResponse.meta?.totalPages ?? 1)
-        );
-      }
-
-      // Load best selling courses (sorted by enrollmentCount)
-      const bestSellingResponse = await courseService.getCourses({
-        page: 1,
-        size: 10,
-        sort: JSON.stringify({ "enrollmentCount": "desc" })
-      });
-      
-      if (bestSellingResponse.success) {
-        setBestSellingCourses(bestSellingResponse.data);
-      }
-      // Load discounted courses
-      const discountedResponse = await courseService.getCourses({
-        page: 1,
-        size: 20,
-      });
-      
-      if (discountedResponse.success) {
-        // Filter only courses that have discountedPrice less than price
-        const filtered = discountedResponse.data.filter(
-          course => course.discountedPrice && course.discountedPrice < course.price
-        )
-        // Sort by highest discount percentage
-        .sort((a, b) => ((b.price - (b.discountedPrice || 0)) / b.price - (a.price - (a.discountedPrice || 0)) / a.price));
-        setDiscountedCourses(filtered);
-      }
+      await Promise.all([
+        loadCategories(),
+        loadAllCourses(),
+        loadBestSelling(),
+        loadDiscountedCourses(),
+      ]);
     } catch (error) {
       console.error('Error loading data:', error);
       Alert.alert('Error', 'Failed to load data. Please try again.');
@@ -139,86 +199,112 @@ export default function HomeScreen() {
     loadData();
   }, []);
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-    }).format(price);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setSelectedCategory('');
+    await loadData();
+    setRefreshing(false);
   };
+
+  const handleCategoryPress = async (categoryId: string) => {
+    if (selectedCategory === categoryId) {
+      setSelectedCategory('');
+      setFilteredCourses([]);
+    } else {
+      setSelectedCategory(categoryId);
+      await loadCoursesByCategory(categoryId);
+    }
+  };
+
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
 
   const calculateDiscountPercentage = (price: number, discountPrice: number | null) => {
     if (!discountPrice || discountPrice >= price) return 0;
     return Math.round(((price - discountPrice) / price) * 100);
   };
 
-  const handleCoursePress = (course: Course) => {
+  const handleCoursePress = (course: Course) =>
     router.push(`/course-detail?courseId=${course.id}`);
-  };
 
-  const handleCategoryPress = (categoryId: string) => {
-    if (selectedCategory === categoryId) {
-      // If same category is pressed, show all courses
-      setSelectedCategory('');
-      setFilteredCourses(courses);
+  const handleScroll = ({ nativeEvent }: { nativeEvent: any }) => {
+    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+    const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 300;
+
+    if (!nearBottom) return;
+
+    if (selectedCategory) {
+      loadMoreFilteredCourses();
     } else {
-      // Filter courses by selected category
-      setSelectedCategory(categoryId);
-      const filtered = courses.filter(course => 
-        course.category === categories.find(cat => cat.id === categoryId)?.name
-      );
-      setFilteredCourses(filtered);
+      loadMoreCourses();
     }
   };
 
-  const loadMoreCourses = async () => {
-    if (coursesLoadingMore || !coursesHasMore) return;
-    setCoursesLoadingMore(true);
-    try {
-      const nextPage = coursesPage + 1;
-      const res = await courseService.getCourses({
-        page: nextPage,
-        size: 10,
-        sort: JSON.stringify({ 'createdAt': 'desc' }),
-      });
-      if (res.success) {
-        const newCourses = res.data;
-        setCourses(prev => [...prev, ...newCourses]);
-        setCoursesPage(nextPage);
-        setCoursesHasMore(nextPage < (res.meta?.totalPages ?? nextPage));
-        if (selectedCategory) {
-          const categoryName = categories.find(cat => cat.id === selectedCategory)?.name;
-          setFilteredCourses(prev => [
-            ...prev,
-            ...newCourses.filter(c => c.category === categoryName),
-          ]);
-        }
-      }
-    } catch (e) {
-      console.error('loadMoreCourses error', e);
-    } finally {
-      setCoursesLoadingMore(false);
-    }
-  };
+  const renderHeroBanner = ({ item }: { item: typeof heroBanners[0] }) => (
+    <TouchableOpacity
+      className="rounded-3xl overflow-hidden bg-black/30 mr-4"
+      style={{ width: width - 40 }}
+      activeOpacity={0.9}
+    >
+      <ImageBackground source={{ uri: item.image }} className="w-full h-48" resizeMode="cover">
+        <View className="flex-1 bg-black/40 justify-end">
+          <BlurView intensity={60} tint="dark" className="p-6 border-t border-white/10">
+            <Text className="text-2xl font-bold text-white mb-2">{item.title}</Text>
+            <Text className="text-white/80 mb-4" numberOfLines={2}>{item.subtitle}</Text>
+            <TouchableOpacity className="bg-primary py-3 px-6 rounded-2xl self-start">
+              <Text className="text-white font-semibold">{item.buttonText}</Text>
+            </TouchableOpacity>
+          </BlurView>
+        </View>
+      </ImageBackground>
+    </TouchableOpacity>
+  );
+
+  const renderCategoryCard = ({ item }: { item: Category }) => (
+    <TouchableOpacity
+      className={`ml-4 rounded-2xl overflow-hidden border-2 ${
+        selectedCategory === item.id ? 'border-primary' : 'border-transparent'
+      }`}
+      onPress={() => handleCategoryPress(item.id)}
+    >
+      <BlurView
+        intensity={selectedCategory === item.id ? 60 : 30}
+        tint="dark"
+        className="py-4 px-5 items-center"
+        style={{ minWidth: 90 }}
+      >
+        <Ionicons
+          name="folder-outline"
+          size={24}
+          color={selectedCategory === item.id ? '#8b45ff' : '#fff'}
+        />
+        <Text
+          className={`text-xs mt-2 text-center ${
+            selectedCategory === item.id ? 'text-primary font-semibold' : 'text-white'
+          }`}
+          numberOfLines={2}
+        >
+          {item.name}
+        </Text>
+      </BlurView>
+    </TouchableOpacity>
+  );
 
   const renderHorizontalCourseCard = ({ item }: { item: Course }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       className="rounded-2xl overflow-hidden bg-black/30 mr-4"
       style={{ width: CARD_WIDTH }}
       activeOpacity={0.9}
       onPress={() => handleCoursePress(item)}
     >
-      <Image 
-        source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }} 
-        className="w-full h-40" 
+      <Image
+        source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }}
+        className="w-full h-40"
         resizeMode="cover"
       />
       <BlurView intensity={80} tint="dark" className="p-4">
-        <Text className="text-base font-bold text-white mb-2" numberOfLines={2}>
-          {item.title}
-        </Text>
-        <Text className="text-xs text-white/70 mb-2" numberOfLines={2}>
-          {item.description}
-        </Text>
+        <Text className="text-base font-bold text-white mb-2" numberOfLines={2}>{item.title}</Text>
+        <Text className="text-xs text-white/70 mb-2" numberOfLines={2}>{item.description}</Text>
         <View className="flex-row items-center mb-2">
           <View className="flex-row items-center mr-4">
             <Ionicons name="star" size={14} color="#fbbf24" />
@@ -254,17 +340,16 @@ export default function HomeScreen() {
 
   const renderGridCourseCard = ({ item }: { item: Course }) => {
     const discountPercentage = calculateDiscountPercentage(item.price, item.discountedPrice);
-    
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         className="rounded-2xl overflow-hidden bg-black/30 mb-4"
         style={{ width: SMALL_CARD_WIDTH }}
         activeOpacity={0.9}
         onPress={() => handleCoursePress(item)}
       >
-        <Image 
-          source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }} 
-          className="w-full h-32" 
+        <Image
+          source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }}
+          className="w-full h-32"
           resizeMode="cover"
         />
         {discountPercentage > 0 && (
@@ -273,12 +358,8 @@ export default function HomeScreen() {
           </View>
         )}
         <BlurView intensity={80} tint="dark" className="p-3">
-          <Text className="text-sm font-bold text-white mb-1" numberOfLines={2}>
-            {item.title}
-          </Text>
-          <Text className="text-xs text-white/60 mb-2" numberOfLines={1}>
-            {item.category}
-          </Text>
+          <Text className="text-sm font-bold text-white mb-1" numberOfLines={2}>{item.title}</Text>
+          <Text className="text-xs text-white/60 mb-2" numberOfLines={1}>{item.category}</Text>
           <View className="flex-row items-center mb-2">
             <Ionicons name="star" size={12} color="#fbbf24" />
             <Text className="text-xs text-white/70 ml-1">{item.rating}</Text>
@@ -298,66 +379,6 @@ export default function HomeScreen() {
     );
   };
 
-  const renderHeroBanner = ({ item }: { item: typeof heroBanners[0] }) => (
-    <TouchableOpacity 
-      className="rounded-3xl overflow-hidden bg-black/30 mr-4"
-      style={{ width: width - 40 }}
-      activeOpacity={0.9}
-    >
-      <ImageBackground 
-        source={{ uri: item.image }}
-        className="w-full h-48"
-        resizeMode="cover"
-      >
-        <View className="flex-1 bg-black/40 justify-end">
-          <BlurView intensity={60} tint="dark" className="p-6 border-t border-white/10">
-            <Text className="text-2xl font-bold text-white mb-2">
-              {item.title}
-            </Text>
-            <Text className="text-white/80 mb-4" numberOfLines={2}>
-              {item.subtitle}
-            </Text>
-            <TouchableOpacity className="bg-primary py-3 px-6 rounded-2xl self-start">
-              <Text className="text-white font-semibold">{item.buttonText}</Text>
-            </TouchableOpacity>
-          </BlurView>
-        </View>
-      </ImageBackground>
-    </TouchableOpacity>
-  );
-
-  const renderCategoryCard = ({ item }: { item: Category }) => (
-    <TouchableOpacity
-      className={`ml-4 rounded-2xl overflow-hidden ${
-        selectedCategory === item.id ? 'border-2 border-primary' : ''
-      }`}
-      onPress={() => handleCategoryPress(item.id)}
-    >
-      <BlurView
-        intensity={selectedCategory === item.id ? 60 : 30}
-        tint="dark"
-        className="py-4 px-5 items-center"
-        style={{ minWidth: 90 }}
-      >
-        <Ionicons
-          name="folder-outline"
-          size={24}
-          color={selectedCategory === item.id ? '#8b45ff' : '#fff'}
-        />
-        <Text
-          className={`text-xs mt-2 text-center ${
-            selectedCategory === item.id 
-              ? 'text-primary font-semibold' 
-              : 'text-white'
-          }`}
-          numberOfLines={2}
-        >
-          {item.name}
-        </Text>
-      </BlurView>
-    </TouchableOpacity>
-  );
-
   if (loading) {
     return (
       <View className="flex-1 justify-center items-center bg-black">
@@ -366,6 +387,9 @@ export default function HomeScreen() {
       </View>
     );
   }
+  const activeCourseList = selectedCategory ? filteredCourses : courses;
+  const activeHasMore = selectedCategory ? filteredHasMore : coursesHasMore;
+  const activeLoadingMore = selectedCategory ? filteredLoadingMore : coursesLoadingMore;
 
   return (
     <ImageBackground
@@ -375,9 +399,7 @@ export default function HomeScreen() {
       <StatusBar style="light" />
       <View className="flex-1 bg-black/50">
         <ScrollView
-          contentContainerStyle={{ 
-            paddingTop: Platform.OS === 'ios' ? 60 : 40 
-          }}
+          contentContainerStyle={{ paddingTop: Platform.OS === 'ios' ? 60 : 40 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -386,17 +408,7 @@ export default function HomeScreen() {
               colors={['#8b45ff']}
             />
           }
-          onScroll={({ nativeEvent }) => {
-            const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-            if (
-              !selectedCategory &&
-              coursesHasMore &&
-              !coursesLoadingMore &&
-              layoutMeasurement.height + contentOffset.y >= contentSize.height - 300
-            ) {
-              loadMoreCourses();
-            }
-          }}
+          onScroll={handleScroll}
           scrollEventThrottle={400}
           showsVerticalScrollIndicator={false}
         >
@@ -413,9 +425,7 @@ export default function HomeScreen() {
               <BlurView intensity={20} tint="dark" className="flex-1 justify-center items-center">
                 <Ionicons name="cart-outline" size={24} color="#fff" />
                 {cartCount > 0 && (
-                  <View
-                    className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary justify-center items-center"
-                  >
+                  <View className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary justify-center items-center">
                     <Text className="text-white text-[9px] font-bold">
                       {cartCount > 9 ? '9+' : cartCount}
                     </Text>
@@ -427,7 +437,11 @@ export default function HomeScreen() {
 
           {/* Search Bar */}
           <View className="px-5 mb-6">
-            <BlurView intensity={40} tint="dark" className="flex-row items-center px-4 h-12 rounded-full overflow-hidden border border-white/10">
+            <BlurView
+              intensity={40}
+              tint="dark"
+              className="flex-row items-center px-4 h-12 rounded-full overflow-hidden border border-white/10"
+            >
               <Ionicons name="search" size={20} color="rgba(255,255,255,0.6)" />
               <TextInput
                 className="flex-1 ml-3 text-base text-white"
@@ -444,7 +458,7 @@ export default function HomeScreen() {
             </BlurView>
           </View>
 
-          {/* Hero Section - Banner Gallery */}
+          {/* Hero Banners */}
           <View className="mb-6">
             <FlatList
               horizontal
@@ -454,12 +468,12 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 20 }}
               pagingEnabled
-              snapToInterval={width - 40 + 16} // card width + margin
+              snapToInterval={width - 40 + 16}
               decelerationRate="fast"
             />
           </View>
 
-          {/* Categories Carousel */}
+          {/* Categories */}
           <View className="mb-6">
             <Text className="text-xl font-bold text-white px-5 mb-4">Categories</Text>
             <FlatList
@@ -472,37 +486,8 @@ export default function HomeScreen() {
             />
           </View>
 
-          {/* Filtered Courses by Category */}
-          {selectedCategory && (
-            <View className="mb-6">
-              <View className="flex-row justify-between items-center px-5 mb-4">
-                <Text className="text-xl font-bold text-white">
-                  {categories.find(cat => cat.id === selectedCategory)?.name} Courses
-                </Text>
-                <Text className="text-sm text-white/50">{filteredCourses.length} courses</Text>
-              </View>
-              {filteredCourses.length > 0 ? (
-                <FlatList
-                  data={filteredCourses}
-                  renderItem={renderGridCourseCard}
-                  keyExtractor={item => item.id}
-                  numColumns={2}
-                  columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
-                  scrollEnabled={false}
-                  ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
-                />
-              ) : (
-                <View className="items-center py-10">
-                  <Ionicons name="folder-open-outline" size={48} color="rgba(255,255,255,0.3)" />
-                  <Text className="text-lg font-semibold text-white mt-4">No courses found</Text>
-                  <Text className="text-sm text-white/50 mt-2">This category has no courses yet</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {/* Best Selling Courses */}
-          {bestSellingCourses.length > 0 && !selectedCategory && (
+          {/* Best Selling (hidden when a category is selected) */}
+          {!selectedCategory && bestSellingCourses.length > 0 && (
             <View className="mb-6">
               <View className="flex-row justify-between items-center px-5 mb-4">
                 <Text className="text-xl font-bold text-white">Best Selling</Text>
@@ -521,8 +506,8 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* Discounted Courses Grid */}
-          {discountedCourses.length > 0 && !selectedCategory && (
+          {/* Special Offers (hidden when a category is selected) */}
+          {!selectedCategory && discountedCourses.length > 0 && (
             <View className="mb-6">
               <View className="flex-row justify-between items-center px-5 mb-4">
                 <Text className="text-xl font-bold text-white">Special Offers</Text>
@@ -535,46 +520,54 @@ export default function HomeScreen() {
                 numColumns={2}
                 columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
                 scrollEnabled={false}
-                ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
               />
             </View>
           )}
 
-          {/* All Courses (paginated) */}
-          {!selectedCategory && courses.length > 0 && (
-            <View className="mb-2">
-              <View className="flex-row justify-between items-center px-5 mb-4">
-                <Text className="text-xl font-bold text-white">Tất cả khóa học</Text>
-                <Text className="text-sm text-white/50">{courses.length} khóa học</Text>
-              </View>
+          {/* All Courses / Category-filtered Courses */}
+          <View className="mb-2">
+            <View className="flex-row justify-between items-center px-5 mb-4">
+              <Text className="text-xl font-bold text-white">
+                {selectedCategory
+                  ? `${categories.find(c => c.id === selectedCategory)?.name} Courses`
+                  : 'Tất cả khóa học'}
+              </Text>
+              <Text className="text-sm text-white/50">{activeCourseList.length} khóa học</Text>
+            </View>
+
+            {activeCourseList.length > 0 ? (
               <FlatList
-                data={courses}
+                data={activeCourseList}
                 renderItem={renderGridCourseCard}
                 keyExtractor={item => item.id}
                 numColumns={2}
                 columnWrapperStyle={{ justifyContent: 'space-between', paddingHorizontal: 20 }}
                 scrollEnabled={false}
               />
-              {coursesLoadingMore && (
-                <View className="py-4 items-center">
-                  <ActivityIndicator color="#8b45ff" size="small" />
-                  <Text className="text-white/40 text-xs mt-2">Đang tải thêm...</Text>
-                </View>
-              )}
-              {!coursesHasMore && courses.length > 0 && (
-                <Text className="text-white/30 text-xs text-center py-3">
-                  Đã hiển thị tất cả {courses.length} khóa học
-                </Text>
-              )}
-            </View>
-          )}
+            ) : (
+              <View className="items-center py-10">
+                <Ionicons name="folder-open-outline" size={48} color="rgba(255,255,255,0.3)" />
+                <Text className="text-lg font-semibold text-white mt-4">No courses found</Text>
+                <Text className="text-sm text-white/50 mt-2">This category has no courses yet</Text>
+              </View>
+            )}
 
-          {/* Bottom Padding for Tab Bar */}
+            {activeLoadingMore && (
+              <View className="py-4 items-center">
+                <ActivityIndicator color="#8b45ff" size="small" />
+                <Text className="text-white/40 text-xs mt-2">Đang tải thêm...</Text>
+              </View>
+            )}
+            {!activeHasMore && activeCourseList.length > 0 && (
+              <Text className="text-white/30 text-xs text-center py-3">
+                Đã hiển thị tất cả {activeCourseList.length} khóa học
+              </Text>
+            )}
+          </View>
+
           <View style={{ height: 100 }} />
         </ScrollView>
       </View>
     </ImageBackground>
   );
 }
-
-

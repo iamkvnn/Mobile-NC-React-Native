@@ -6,7 +6,6 @@ const API_CONFIG = {
   BASE_URL: 'http://10.0.2.2:9090/api/v1',
   TIMEOUT: 30000,
   HEADERS: {
-    'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
   WITH_CREDENTIALS: false,

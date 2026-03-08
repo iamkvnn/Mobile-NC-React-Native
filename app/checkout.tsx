@@ -81,7 +81,7 @@ export default function CheckoutScreen() {
           (parsed.queryParams?.orderId as string) || orderRes.data.id;
         navigation.dispatch(
             CommonActions.reset({
-                index: 0,
+                index: 1,
                 routes: [
                 { name: 'index' },
                 { 

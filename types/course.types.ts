@@ -64,6 +64,7 @@ export interface CourseFilters {
 
 export interface CourseSearchParams {
   query?: string;
+  categoryId?: string;
   page?: number;
   size?: number;
   sort?: string; // JSON stringified sort object like {"createdAt":"desc"}

@@ -1,83 +1,48 @@
-import { User, UpdateUserRequest, UpdateUserFormData } from '@/types/api.types';
+import { User, UpdateUserRequest } from '@/types/api.types';
 import { apiService } from './api.service';
+import { mime } from 'zod';
+import { getMimeType } from '@/utils/mimeUtil';
 
-/**
- * User Service
- * Handles all user-related API calls
- */
 class UserService {
   private readonly USER_ENDPOINTS = {
     ME: '/users/me',
     UPDATE_USER: (id: string) => `/users/${id}`,
   };
 
-  /**
-   * Get current user profile
-   * @returns Current user data
-   */
   async getCurrentUser(): Promise<User> {
-    try {
-      const response = await apiService.get<any>(this.USER_ENDPOINTS.ME);
-      return response.data;
-    } catch (error) {
-      console.error('Get current user error:', error);
-      throw error;
-    }
+    const response = await apiService.get<any>(this.USER_ENDPOINTS.ME);
+    return response.data;
   }
 
-  /**
-   * Update user profile by ID
-   * PUT /api/v1/users/{id}
-   * @param id - User ID
-   * @param data - User data to update (name, gender)
-   * @returns Updated user data
-   */
-  async updateUser(id: string, data: UpdateUserRequest): Promise<User> {
-    try {
-      const response = await apiService.put<any>(
-        this.USER_ENDPOINTS.UPDATE_USER(id),
-        data
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Update user error:', error);
-      throw error;
+  async updateUser(id: string, data: UpdateUserRequest, avatar?: File): Promise<User> {
+    const formData = new FormData();
+    formData.append('user', {
+      string: JSON.stringify(data),
+      type: 'application/json',
+      name: 'user.json',
+    } as any);
+    if (avatar) {
+      const uri = (avatar as any).uri as string;
+      const fileName = (avatar as any).name || uri.split('/').pop() || 'avatar.jpg';
+      const mimeType = getMimeType(fileName);
+      formData.append('avatar', {
+        uri,
+        type: mimeType,
+        name: fileName,
+      } as any);
     }
-  }
-  /**
-   * Update user profile with avatar
-   * PUT /api/v1/users/{id} (multipart/form-data)
-   * @param id - User ID  
-   * @param data - User data and optional avatar file
-   * @returns Updated user data
-   */
-  async updateUserWithAvatar(id: string, data: UpdateUserFormData): Promise<User> {
-    try {
-      const formData = new FormData();
-      
-      // Add user data as JSON blob
-      formData.append('user', JSON.stringify(data.user));
-      
-      // Add avatar file if provided
-      if (data.avatar) {
-        formData.append('avatar', data.avatar);
+
+    const response = await apiService.put(
+      this.USER_ENDPOINTS.UPDATE_USER(id),
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       }
-
-      const response = await apiService.put(
-        this.USER_ENDPOINTS.UPDATE_USER(id),
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
-
-      return response.data;
-    } catch (error) {
-      console.error('Update user with avatar error:', error);
-      throw error;
-    }
-  }}
+    );
+    return response.data;
+  }
+}
 
 export const userService = new UserService();
