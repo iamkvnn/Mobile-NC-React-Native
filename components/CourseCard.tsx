@@ -5,14 +5,17 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Course } from '@/types/course.types';
 
 interface CourseCardProps {
   course: Course;
   onPress: (course: Course) => void;
+  isWishlisted?: boolean;
+  onWishlistToggle?: (course: Course) => void;
 }
 
-const CourseCard: React.FC<CourseCardProps> = ({ course, onPress }) => {
+const CourseCard: React.FC<CourseCardProps> = ({ course, onPress, isWishlisted = false, onWishlistToggle }) => {
   const formatDuration = (minutes: number): string => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -36,7 +39,25 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onPress }) => {
       activeOpacity={0.7}
     >
       {course.thumbnail && (
-        <Image source={{ uri: course.thumbnail }} style={styles.thumbnail} />
+        <View style={styles.thumbnailContainer}>
+          <Image source={{ uri: course.thumbnail }} style={styles.thumbnail} />
+          {onWishlistToggle && (
+            <TouchableOpacity
+              style={styles.wishlistBtn}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onWishlistToggle(course);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons
+                name={isWishlisted ? 'heart' : 'heart-outline'}
+                size={22}
+                color={isWishlisted ? '#ef4444' : '#fff'}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       )}
       
       <View style={styles.content}>
@@ -104,6 +125,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
     overflow: 'hidden',
+  },
+  thumbnailContainer: {
+    position: 'relative',
+  },
+  wishlistBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   thumbnail: {
     width: '100%',

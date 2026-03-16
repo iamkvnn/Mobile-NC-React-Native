@@ -115,18 +115,6 @@ class AuthService {
   }
 
   /**
-   * Logout user
-   */
-  async logout(): Promise<void> {
-    try {
-      await apiService.post(this.AUTH_ENDPOINTS.LOGOUT);
-    } catch (error) {
-      console.error('Logout error:', error);
-      // Even if network fails, client should clear state
-    }
-  }
-
-  /**
    * Send OTP for changing password
    * POST /api/v1/auth/send-change-password-otp
    * @param email - User email

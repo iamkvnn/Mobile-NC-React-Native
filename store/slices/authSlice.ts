@@ -217,8 +217,6 @@ export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
-      const { authService } = require('@/services/auth.service');
-      await authService.logout();
       return true;
     } catch (error: any) {
       return rejectWithValue({ message: error.message || 'Logout failed' });

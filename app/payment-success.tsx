@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,12 @@ import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import orderService from '@/services/order.service';
 
 export default function PaymentSuccessScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
+  const [courseIds, setCourseIds] = useState<string[]>([]);
+
   useFocusEffect(
     React.useCallback(() => {
         const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -24,6 +27,23 @@ export default function PaymentSuccessScreen() {
         return () => subscription.remove();
     }, [])
   );
+
+  useEffect(() => {
+    if (orderId) {
+      loadOrderItems();
+    }
+  }, [orderId]);
+
+  const loadOrderItems = async () => {
+    try {
+      const res = await orderService.getOrderById(orderId!);
+      if (res.success && res.data?.items) {
+        setCourseIds(res.data.items.map((item: any) => item.courseId));
+      }
+    } catch (e) {
+      // Silent fail – review prompt is optional
+    }
+  };
 
   return (
     <ImageBackground
@@ -72,6 +92,22 @@ export default function PaymentSuccessScreen() {
                 <Text className="text-white font-bold text-base">Xem chi tiết đơn hàng</Text>
               </TouchableOpacity>
             ) : null}
+
+            {/* Review prompt – show first course if available */}
+            {courseIds.length > 0 && (
+              <TouchableOpacity
+                className="w-full bg-yellow-500/20 border border-yellow-500/40 py-4 rounded-2xl items-center flex-row justify-center gap-2 mb-3"
+                onPress={() =>
+                  router.replace({
+                    pathname: '/course-detail',
+                    params: { courseId: courseIds[0] },
+                  })
+                }
+              >
+                <Ionicons name="star-outline" size={18} color="#fbbf24" />
+                <Text className="text-yellow-400 font-semibold text-base">Đánh giá khóa học</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               className="w-full border border-white/20 py-4 rounded-2xl items-center"

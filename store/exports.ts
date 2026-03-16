@@ -10,6 +10,15 @@ export {
   selectCartCount,
   selectCartLoading,
 } from './slices/cartSlice';
+export {
+  fetchWishlist,
+  addToWishlist,
+  removeFromWishlist,
+  clearWishlist,
+  selectWishlistCourseIds,
+  selectIsWishlisted,
+  selectWishlistLoading,
+} from './slices/wishlistSlice';
 export type { RootState, AppDispatch } from './index';
 export { useAppDispatch, useAppSelector } from './hooks';
 

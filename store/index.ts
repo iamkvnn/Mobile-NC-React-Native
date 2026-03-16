@@ -4,11 +4,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import authReducer from './slices/authSlice';
 import courseReducer from './slices/courseSlice';
 import cartReducer from './slices/cartSlice';
+import wishlistReducer from './slices/wishlistSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
   courses: courseReducer,
   cart: cartReducer,
+  wishlist: wishlistReducer,
 });
 
 const persistConfig = {

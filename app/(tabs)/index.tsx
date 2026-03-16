@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,11 +18,17 @@ import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectUser } from '@/store/slices/authSlice';
 import { Course, Category } from '@/types/course.types';
 import courseService from '@/services/course.service';
 import { selectCartCount } from '@/store/slices/cartSlice';
+import {
+  fetchWishlist,
+  addToWishlist,
+  removeFromWishlist,
+  selectWishlistCourseIds,
+} from '@/store/slices/wishlistSlice';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.75;
@@ -32,6 +38,20 @@ export default function HomeScreen() {
   const user = useAppSelector(selectUser);
   const router = useRouter();
   const cartCount = useAppSelector(selectCartCount);
+  const dispatch = useAppDispatch();
+  const wishlistCourseIds = useAppSelector(selectWishlistCourseIds);
+
+  const handleWishlistToggle = useCallback(async (course: Course) => {
+    try {
+      if (wishlistCourseIds.includes(course.id)) {
+        await dispatch(removeFromWishlist(course.id)).unwrap();
+      } else {
+        await dispatch(addToWishlist(course.id)).unwrap();
+      }
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể cập nhật danh sách yêu thích.');
+    }
+  }, [dispatch, wishlistCourseIds]);
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -197,6 +217,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     loadData();
+    dispatch(fetchWishlist());
   }, []);
 
   const onRefresh = async () => {
@@ -297,11 +318,23 @@ export default function HomeScreen() {
       activeOpacity={0.9}
       onPress={() => handleCoursePress(item)}
     >
-      <Image
-        source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }}
-        className="w-full h-40"
-        resizeMode="cover"
-      />
+      <View style={{ position: 'relative' }}>
+        <Image
+          source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }}
+          className="w-full h-40"
+          resizeMode="cover"
+        />
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 8, right: 8, width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => handleWishlistToggle(item)}
+        >
+          <Ionicons
+            name={wishlistCourseIds.includes(item.id) ? 'heart' : 'heart-outline'}
+            size={20}
+            color={wishlistCourseIds.includes(item.id) ? '#ef4444' : '#fff'}
+          />
+        </TouchableOpacity>
+      </View>
       <BlurView intensity={80} tint="dark" className="p-4">
         <Text className="text-base font-bold text-white mb-2" numberOfLines={2}>{item.title}</Text>
         <Text className="text-xs text-white/70 mb-2" numberOfLines={2}>{item.description}</Text>
@@ -347,16 +380,28 @@ export default function HomeScreen() {
         activeOpacity={0.9}
         onPress={() => handleCoursePress(item)}
       >
-        <Image
-          source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }}
-          className="w-full h-32"
-          resizeMode="cover"
-        />
-        {discountPercentage > 0 && (
-          <View className="absolute top-2 right-2 bg-red-500 px-2 py-1 rounded-md">
-            <Text className="text-white text-xs font-bold">-{discountPercentage}%</Text>
-          </View>
-        )}
+        <View style={{ position: 'relative' }}>
+          <Image
+            source={{ uri: item.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400' }}
+            className="w-full h-32"
+            resizeMode="cover"
+          />
+          {discountPercentage > 0 && (
+            <View className="absolute top-2 left-2 bg-red-500 px-2 py-1 rounded-md">
+              <Text className="text-white text-xs font-bold">-{discountPercentage}%</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 6, right: 6, width: 30, height: 30, borderRadius: 15, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' }}
+            onPress={() => handleWishlistToggle(item)}
+          >
+            <Ionicons
+              name={wishlistCourseIds.includes(item.id) ? 'heart' : 'heart-outline'}
+              size={16}
+              color={wishlistCourseIds.includes(item.id) ? '#ef4444' : '#fff'}
+            />
+          </TouchableOpacity>
+        </View>
         <BlurView intensity={80} tint="dark" className="p-3">
           <Text className="text-sm font-bold text-white mb-1" numberOfLines={2}>{item.title}</Text>
           <Text className="text-xs text-white/60 mb-2" numberOfLines={1}>{item.category}</Text>

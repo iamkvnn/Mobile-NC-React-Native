@@ -28,9 +28,11 @@ import CourseSearchBar from './CourseSearchBar';
 
 interface CourseListProps {
   onCoursePress?: (course: Course) => void;
+  wishlistCourseIds?: string[];
+  onWishlistToggle?: (course: Course) => void;
 }
 
-const CourseList: React.FC<CourseListProps> = ({ onCoursePress }) => {
+const CourseList: React.FC<CourseListProps> = ({ onCoursePress, wishlistCourseIds, onWishlistToggle }) => {
   const dispatch = useDispatch<AppDispatch>();
   const {
     courses,
@@ -138,8 +140,13 @@ const CourseList: React.FC<CourseListProps> = ({ onCoursePress }) => {
   }, [onCoursePress]);
 
   const renderCourseCard = useCallback(({ item }: { item: Course }) => (
-    <CourseCard course={item} onPress={handleCoursePress} />
-  ), [handleCoursePress]);
+    <CourseCard
+      course={item}
+      onPress={handleCoursePress}
+      isWishlisted={wishlistCourseIds?.includes(item.id)}
+      onWishlistToggle={onWishlistToggle}
+    />
+  ), [handleCoursePress, wishlistCourseIds, onWishlistToggle]);
 
   const renderLoadingFooter = useCallback(() => {
     if (!loadingMore) return null;

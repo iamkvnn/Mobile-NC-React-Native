@@ -3,23 +3,47 @@
  * Course list screen within the tabs layout
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity, Platform } from 'react-native';
+import React, { useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { StatusBar } from 'expo-status-bar';
 import { Course } from '@/types/course.types';
 import CourseList from '@/components/CourseList';
-import { useAppSelector } from '@/store/hooks';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
 import { selectCartCount } from '@/store/slices/cartSlice';
+import {
+  fetchWishlist,
+  addToWishlist,
+  removeFromWishlist,
+  selectWishlistCourseIds,
+} from '@/store/slices/wishlistSlice';
 
 const CoursesTabScreen: React.FC = () => {
   const cartCount = useAppSelector(selectCartCount);
+  const dispatch = useAppDispatch();
+  const wishlistCourseIds = useAppSelector(selectWishlistCourseIds);
+
+  useEffect(() => {
+    dispatch(fetchWishlist());
+  }, [dispatch]);
 
   const handleCoursePress = (course: Course) => {
     router.push({ pathname: '/course-detail', params: { courseId: course.id } });
   };
+
+  const handleWishlistToggle = useCallback(async (course: Course) => {
+    try {
+      if (wishlistCourseIds.includes(course.id)) {
+        await dispatch(removeFromWishlist(course.id)).unwrap();
+      } else {
+        await dispatch(addToWishlist(course.id)).unwrap();
+      }
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể cập nhật danh sách yêu thích.');
+    }
+  }, [dispatch, wishlistCourseIds]);
 
   return (
     <View className="flex-1 bg-[#0f0f1a]">
@@ -48,7 +72,11 @@ const CoursesTabScreen: React.FC = () => {
       </View>
 
       <View className="flex-1">
-        <CourseList onCoursePress={handleCoursePress} />
+        <CourseList
+          onCoursePress={handleCoursePress}
+          wishlistCourseIds={wishlistCourseIds}
+          onWishlistToggle={handleWishlistToggle}
+        />
       </View>
     </View>
   );

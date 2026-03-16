@@ -731,6 +731,25 @@ export default function ProfileScreen() {
                 </BlurView>
               </TouchableOpacity>
 
+              {/* Wishlist */}
+              <TouchableOpacity
+                className="mb-3 rounded-2xl overflow-hidden"
+                onPress={() => router.push('/wishlist')}
+              >
+                <BlurView intensity={20} tint="dark" className="flex-row justify-between items-center p-4 border border-white/10 rounded-2xl">
+                  <View className="flex-row items-center gap-4">
+                    <View className="w-11 h-11 rounded-xl justify-center items-center bg-red-500/30">
+                      <Ionicons name="heart-outline" size={20} color="#ef4444" />
+                    </View>
+                    <View>
+                      <Text className="text-base font-semibold text-white">Danh sách yêu thích</Text>
+                      <Text className="text-xs text-white/50">Các khóa học bạn đã lưu</Text>
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.5)" />
+                </BlurView>
+              </TouchableOpacity>
+
               <TouchableOpacity className="mb-3 rounded-2xl overflow-hidden" onPress={openEditProfile}>
                 <BlurView intensity={20} tint="dark" className="flex-row justify-between items-center p-4 border border-white/10 rounded-2xl">
                   <View className="flex-row items-center gap-4">

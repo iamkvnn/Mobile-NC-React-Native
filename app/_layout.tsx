@@ -32,6 +32,7 @@ export default function RootLayout() {
             <Stack.Screen name="payment-success" />
             <Stack.Screen name="orders" />
             <Stack.Screen name="order-detail" />
+            <Stack.Screen name="wishlist" />
           </Stack>
         </AuthNavigation>
       </PersistGate>
