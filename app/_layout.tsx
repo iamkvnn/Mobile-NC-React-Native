@@ -4,6 +4,7 @@ import { PersistGate } from "redux-persist/integration/react";
 import { store, persistor } from "@/store";
 import { AuthNavigation } from "@/components/AuthNavigation";
 import { View, ActivityIndicator } from "react-native";
+import { NotificationWrapper } from "@/components/NotificationWrapper";
 import "./global.css";
 
 function LoadingScreen() {
@@ -18,23 +19,26 @@ export default function RootLayout() {
   return (
     <Provider store={store}>
       <PersistGate loading={<LoadingScreen />} persistor={persistor}>
-        <AuthNavigation>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="login" />
-            <Stack.Screen name="register" />
-            <Stack.Screen name="verify-otp" />
-            <Stack.Screen name="forgot-password" />
-            <Stack.Screen name="reset-password" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="cart" />
-            <Stack.Screen name="checkout" />
-            <Stack.Screen name="payment-success" />
-            <Stack.Screen name="orders" />
-            <Stack.Screen name="order-detail" />
-            <Stack.Screen name="wishlist" />
-          </Stack>
-        </AuthNavigation>
+        <NotificationWrapper>
+          <AuthNavigation>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="login" />
+              <Stack.Screen name="register" />
+              <Stack.Screen name="verify-otp" />
+              <Stack.Screen name="forgot-password" />
+              <Stack.Screen name="reset-password" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="cart" />
+              <Stack.Screen name="checkout" />
+              <Stack.Screen name="payment-success" />
+              <Stack.Screen name="orders" />
+              <Stack.Screen name="order-detail" />
+              <Stack.Screen name="wishlist" />
+              <Stack.Screen name="notifications" />
+            </Stack>
+          </AuthNavigation>
+        </NotificationWrapper>
       </PersistGate>
     </Provider>
   );

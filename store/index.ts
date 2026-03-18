@@ -5,12 +5,14 @@ import authReducer from './slices/authSlice';
 import courseReducer from './slices/courseSlice';
 import cartReducer from './slices/cartSlice';
 import wishlistReducer from './slices/wishlistSlice';
+import notificationReducer from './slices/notificationSlice';
 
 const rootReducer = combineReducers({
   auth: authReducer,
   courses: courseReducer,
   cart: cartReducer,
   wishlist: wishlistReducer,
+  notifications: notificationReducer,
 });
 
 const persistConfig = {

@@ -23,6 +23,7 @@ import { selectUser } from '@/store/slices/authSlice';
 import { Course, Category } from '@/types/course.types';
 import courseService from '@/services/course.service';
 import { selectCartCount } from '@/store/slices/cartSlice';
+import { selectUnreadCount } from '@/store/slices/notificationSlice';
 import {
   fetchWishlist,
   addToWishlist,
@@ -38,6 +39,7 @@ export default function HomeScreen() {
   const user = useAppSelector(selectUser);
   const router = useRouter();
   const cartCount = useAppSelector(selectCartCount);
+  const unreadCount = useAppSelector(selectUnreadCount);
   const dispatch = useAppDispatch();
   const wishlistCourseIds = useAppSelector(selectWishlistCourseIds);
 
@@ -463,21 +465,39 @@ export default function HomeScreen() {
               <Text className="text-sm text-white/70">Welcome back!</Text>
               <Text className="text-2xl font-bold text-white">{user?.name || 'User'}</Text>
             </View>
-            <TouchableOpacity
-              className="w-11 h-11 rounded-full overflow-hidden"
-              onPress={() => router.push('/cart')}
-            >
-              <BlurView intensity={20} tint="dark" className="flex-1 justify-center items-center">
-                <Ionicons name="cart-outline" size={24} color="#fff" />
-                {cartCount > 0 && (
-                  <View className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary justify-center items-center">
-                    <Text className="text-white text-[9px] font-bold">
-                      {cartCount > 9 ? '9+' : cartCount}
-                    </Text>
-                  </View>
-                )}
-              </BlurView>
-            </TouchableOpacity>
+            <View className="flex-row items-center gap-3">
+              <TouchableOpacity
+                className="w-11 h-11 rounded-full overflow-hidden"
+                onPress={() => router.push('/notifications')}
+              >
+                <BlurView intensity={20} tint="dark" className="flex-1 justify-center items-center">
+                  <Ionicons name="notifications-outline" size={24} color="#fff" />
+                  {unreadCount > 0 && (
+                    <View className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-500 justify-center items-center">
+                      <Text className="text-white text-[9px] font-bold">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </Text>
+                    </View>
+                  )}
+                </BlurView>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="w-11 h-11 rounded-full overflow-hidden"
+                onPress={() => router.push('/cart')}
+              >
+                <BlurView intensity={20} tint="dark" className="flex-1 justify-center items-center">
+                  <Ionicons name="cart-outline" size={24} color="#fff" />
+                  {cartCount > 0 && (
+                    <View className="absolute top-1 right-1 w-4 h-4 rounded-full bg-primary justify-center items-center">
+                      <Text className="text-white text-[9px] font-bold">
+                        {cartCount > 9 ? '9+' : cartCount}
+                      </Text>
+                    </View>
+                  )}
+                </BlurView>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Search Bar */}

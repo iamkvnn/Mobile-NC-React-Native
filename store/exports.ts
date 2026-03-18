@@ -32,7 +32,6 @@ export {
   sendOtp,
   fetchCurrentUser,
   updateUserProfile,
-  updateUserProfileWithAvatar,
   logoutUser,
   setTempEmail,
   clearError,
@@ -44,3 +43,17 @@ export {
   selectAuthError,
   selectIsInitialized,
 } from './slices/authSlice';
+
+// Notification slice exports
+export {
+  fetchNotifications,
+  fetchUnreadCount,
+  toggleNotificationRead,
+  deleteNotification,
+  addNotification,
+  setWsConnectionStatus,
+  clearNotifications,
+  selectNotifications,
+  selectUnreadCount,
+  selectNotificationsLoading,
+} from './slices/notificationSlice';
